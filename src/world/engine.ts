@@ -343,7 +343,7 @@ export class WorldEngine {
         dx /= len;
         dz /= len;
       }
-      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 5) * dt;
+      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 6) * dt;
       // Axis-separated collision gives wall sliding and prevents walking off islands.
       if (canWalk(this.position.x + dx * speed, this.position.z, this.objects.obstacles))
         this.position.x += dx * speed;
