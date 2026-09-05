@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { s } from './styles';
-import { islands, connections, places } from './world/map';
+import { islands, connections, places, spawn } from './world/map';
 import type { Place } from './world/map';
 import type { WorldEngine, WorldState } from './world/engine';
 import { Soundscape } from './world/audio';
@@ -51,8 +51,9 @@ function OnsenMark() {
   );
 }
 function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
-  const px = (x: number) => 99 + x * 1.52,
-    pz = (z: number) => 124 + z * 1.45;
+  const scale = 0.7;
+  const px = (x: number) => 100 + x * scale,
+    pz = (z: number) => 63 + z * scale;
   return (
     <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden="true">
       <defs>
@@ -99,8 +100,8 @@ function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
             <ellipse
               cx={px(i.x)}
               cy={pz(i.z)}
-              rx={i.radius * 1.3}
-              ry={i.radius * 1.2}
+              rx={i.radius * scale}
+              ry={i.radius * scale}
               fill="#52635c"
               stroke="#8e9273"
               strokeWidth=".5"
@@ -186,8 +187,9 @@ export default function App() {
   const [visited, setVisited] = useState(savedVisits),
     [activePlace, setActivePlace] = useState<Place>(places[0]);
   const [state, setState] = useState<WorldState>({
-    x: 0,
-    z: 12,
+    x: spawn.x,
+    z: spawn.z,
+    y: spawn.y,
     yaw: 0.17,
     place: places[0],
     nearby: true,
@@ -234,12 +236,12 @@ export default function App() {
         } catch (e) {
           console.error(e);
           setError(
-            'このブラウザで3Dの世界を開けませんでした。WebGLを有効にして、再読み込みしてください。',
+            'This browser could not open the 3D world. Enable WebGL and reload to try again.',
           );
         }
       })
       .catch(() =>
-        setError('世界の読み込みに失敗しました。接続を確認して、再読み込みしてください。'),
+        setError('The world could not load. Check your connection and reload to try again.'),
       );
     return () => {
       cancelled = true;
@@ -279,22 +281,22 @@ export default function App() {
     try {
       setSound(await audio.current!.toggle());
     } catch {
-      notify('環境音を再生できませんでした。もう一度お試しください。');
+      notify('Ambient sound could not start. Please try again.');
     }
   };
   const takePhoto = async () => {
     try {
       await engine.current?.takePhoto();
-      notify('旅の一枚を保存しました。');
+      notify('Your travel photo has been saved.');
     } catch {
-      notify('写真を保存できませんでした。');
+      notify('Your photo could not be saved.');
     }
   };
   const changeTime = () => {
     const next = !night;
     setNight(next);
     engine.current?.setNight(next);
-    notify(next ? '夜の湯影町へ。' : '夕暮れの湯影町へ。');
+    notify(next ? 'Night falls over Yukagecho.' : 'Welcome to Yukagecho at dusk.');
   };
   const close = () => setModal(null);
   return (
@@ -303,6 +305,7 @@ export default function App() {
         ref={container}
         data-world-x={state.x.toFixed(2)}
         data-world-z={state.z.toFixed(2)}
+        data-world-y={state.y.toFixed(2)}
         data-world-yaw={state.yaw.toFixed(3)}
         data-world-paused={state.paused}
         {...stylex.props(s.world)}
@@ -319,39 +322,41 @@ export default function App() {
               {...stylex.props(s.brand)}
               onClick={() => {
                 engine.current?.resetView();
-                notify('視点を戻しました。');
+                notify('Camera view reset.');
               }}
-              aria-label="湯影町・視点を戻す"
+              aria-label="Yukagecho - Reset camera"
             >
               <OnsenMark />
               <span>
-                <span {...stylex.props(s.brandTitle)}>湯影町</span>
-                <span {...stylex.props(s.brandSub)}>YUKAGECHO</span>
+                <span {...stylex.props(s.brandTitle)}>Yukagecho</span>
+                <span lang="ja" {...stylex.props(s.brandSub)}>
+                  湯影町
+                </span>
               </span>
             </button>
-            <p {...stylex.props(s.motto)}>雲の上で、ひと休み。</p>
-            <nav aria-label="旅の設定" {...stylex.props(s.toolbar)}>
+            <p {...stylex.props(s.motto)}>A quiet moment above the clouds.</p>
+            <nav aria-label="World settings" {...stylex.props(s.toolbar)}>
               <button
                 {...stylex.props(s.iconButton, sound && s.activeButton)}
-                aria-label={sound ? '環境音をオフ' : '環境音をオン'}
+                aria-label={sound ? 'Mute ambient sound' : 'Enable ambient sound'}
                 aria-pressed={sound}
-                title={sound ? '環境音をオフ' : '環境音をオン'}
+                title={sound ? 'Mute ambient sound' : 'Enable ambient sound'}
                 onClick={() => void toggleAudio()}
               >
                 {sound ? <Volume2 size={17} /> : <VolumeX size={17} />}
               </button>
               <button
                 {...stylex.props(s.iconButton, s.desktopButton)}
-                aria-label={night ? '夕暮れにする' : '夜にする'}
-                title={night ? '夕暮れにする' : '夜にする'}
+                aria-label={night ? 'Switch to dusk' : 'Switch to night'}
+                title={night ? 'Switch to dusk' : 'Switch to night'}
                 onClick={changeTime}
               >
                 {night ? <Moon size={17} /> : <Sun size={17} />}
               </button>
               <button
                 {...stylex.props(s.iconButton)}
-                aria-label="写真を保存"
-                title="写真を保存"
+                aria-label="Save photo"
+                title="Save photo"
                 onClick={() => void takePhoto()}
                 disabled={!ready}
               >
@@ -359,17 +364,20 @@ export default function App() {
               </button>
               <button
                 {...stylex.props(s.iconButton)}
-                aria-label="操作ガイド"
-                title="操作ガイド"
+                aria-label="Controls"
+                title="Controls"
                 onClick={() => setModal('help')}
               >
                 <CircleHelp size={18} />
               </button>
             </nav>
           </header>
-          <section key={state.place.id} {...stylex.props(s.location)} aria-label="現在地">
-            <span {...stylex.props(s.smallText)}>天空の温泉郷</span>
-            <h1 {...stylex.props(s.placeTitle)}>{state.place.name}</h1>
+          <section key={state.place.id} {...stylex.props(s.location)} aria-label="Current location">
+            <span {...stylex.props(s.smallText)}>FROM FOOTHILLS TO FLOATING WORLDS</span>
+            <h1 {...stylex.props(s.placeTitle)}>{state.place.english}</h1>
+            <p lang="ja" {...stylex.props(s.japaneseName)}>
+              {state.place.name}
+            </p>
             <div {...stylex.props(s.divider)}>
               <span {...stylex.props(s.diamond)} />
             </div>
@@ -380,22 +388,26 @@ export default function App() {
               <kbd {...stylex.props(s.key)}>E</kbd>
               <span>
                 <span {...stylex.props(s.interactSub)}>
-                  {visited.includes(state.place.id) ? '旅のひとこま' : '小さな寄り道'}
+                  {visited.includes(state.place.id) ? 'A TRAVEL MEMORY' : 'A LITTLE DISCOVERY'}
                 </span>
                 <span {...stylex.props(s.interactTitle)}>
                   {state.place.id === 'onsen'
-                    ? '湯けむりにひと休み'
+                    ? 'Pause by the hot springs'
                     : state.place.id === 'shrine'
-                      ? '風に願いを'
+                      ? 'Leave a wish on the wind'
                       : state.place.id === 'inn'
-                        ? '旅の宿を訪ねる'
-                        : '提灯の灯りをたどる'}
+                        ? 'Visit the ryokan'
+                        : state.place.id === 'ascent'
+                          ? 'Take in the view'
+                          : state.place.id === 'ground-bath'
+                            ? 'Visit the springs'
+                            : 'Follow the lanterns'}
                 </span>
               </span>
               <ChevronRight size={15} />
             </button>
           )}
-          <div {...stylex.props(s.controls)} aria-label="操作方法">
+          <div {...stylex.props(s.controls)} aria-label="Keyboard controls">
             <span {...stylex.props(s.controlPart)}>
               <span>
                 {['W', 'A', 'S', 'D'].map((k) => (
@@ -404,40 +416,42 @@ export default function App() {
                   </kbd>
                 ))}
               </span>{' '}
-              移動
+              Walk
             </span>
             <span {...stylex.props(s.controlDivider)} />
-            <span>ドラッグ 視点</span>
+            <span>Drag to look</span>
             <span {...stylex.props(s.controlDivider)} />
             <span {...stylex.props(s.controlPart)}>
-              <kbd {...stylex.props(s.key)}>E</kbd> 調べる
+              <kbd {...stylex.props(s.key)}>E</kbd> Discover
             </span>
             <span {...stylex.props(s.controlDivider)} />
             <span {...stylex.props(s.controlPart)}>
-              <kbd {...stylex.props(s.key)}>M</kbd> 旅の手帖
+              <kbd {...stylex.props(s.key)}>M</kbd> Travel journal
             </span>
           </div>
           <div {...stylex.props(s.mapArea)}>
             <button
               {...stylex.props(s.mapButton)}
-              aria-label="地図と旅の手帖を開く"
-              title="旅の手帖 (M)"
+              aria-label="Open map and travel journal"
+              title="Travel journal (M)"
               onClick={() => setModal('journal')}
             >
               <MiniMap state={state} visited={visited} />
             </button>
             <div {...stylex.props(s.mapCaption)}>
               <Map size={10} />
-              <span>湯めぐり</span>
-              <span>{visited.length} / 4</span>
+              <span>DISCOVERED</span>
+              <span>
+                {visited.length} / {places.length}
+              </span>
             </div>
           </div>
-          <div {...stylex.props(s.touch)} aria-label="タッチ移動">
+          <div {...stylex.props(s.touch)} aria-label="Touch movement">
             {[
-              { label: '前へ', x: 0, y: -1, icon: ArrowUp, style: s.touchUp },
-              { label: '左へ', x: -1, y: 0, icon: ArrowLeft, style: s.touchLeft },
-              { label: '右へ', x: 1, y: 0, icon: ArrowRight, style: s.touchRight },
-              { label: '後ろへ', x: 0, y: 1, icon: ArrowDown, style: s.touchDown },
+              { label: 'Move forward', x: 0, y: -1, icon: ArrowUp, style: s.touchUp },
+              { label: 'Move left', x: -1, y: 0, icon: ArrowLeft, style: s.touchLeft },
+              { label: 'Move right', x: 1, y: 0, icon: ArrowRight, style: s.touchRight },
+              { label: 'Move backward', x: 0, y: 1, icon: ArrowDown, style: s.touchDown },
             ].map(({ label, x, y, icon: Icon, style }) => (
               <button
                 key={label}
@@ -460,7 +474,7 @@ export default function App() {
       )}
       {hideUI && (
         <button {...stylex.props(s.photoReturn)} onClick={() => setHideUI(false)}>
-          H · 旅の画面に戻る
+          H · Show interface
         </button>
       )}
       {toast && (
@@ -471,12 +485,17 @@ export default function App() {
       {(!ready || error) && (
         <div {...stylex.props(s.loading)} role="status">
           <OnsenMark />
-          <h1 {...stylex.props(s.loadingTitle)}>湯影町</h1>
-          <p {...stylex.props(s.loadingCopy)}>{error || '雲の向こうに、旅の支度を。'}</p>
+          <h1 {...stylex.props(s.loadingTitle)}>Yukagecho</h1>
+          <span lang="ja" {...stylex.props(s.brandSub)}>
+            湯影町
+          </span>
+          <p {...stylex.props(s.loadingCopy)}>
+            {error || 'Preparing your journey above the clouds…'}
+          </p>
           {error && (
             <button
               {...stylex.props(s.iconButton)}
-              aria-label="再読み込み"
+              aria-label="Reload"
               onClick={() => location.reload()}
             >
               <RotateCcw size={17} />
@@ -506,20 +525,25 @@ export default function App() {
           <div>
             <span {...stylex.props(s.smallText)}>
               {modal === 'place'
-                ? activePlace.english
+                ? 'A PLACE TO REMEMBER'
                 : modal === 'journal'
                   ? 'A LITTLE TRAVEL JOURNAL'
                   : 'TAKE YOUR TIME'}
             </span>
             <h2 id="dialog-title" {...stylex.props(s.dialogTitle)}>
               {modal === 'place'
-                ? activePlace.name
+                ? activePlace.english
                 : modal === 'journal'
-                  ? '旅の手帖'
-                  : '湯影町の歩き方'}
+                  ? 'Travel journal'
+                  : 'How to explore'}
             </h2>
+            {modal === 'place' && (
+              <p lang="ja" {...stylex.props(s.japaneseName)}>
+                {activePlace.name}
+              </p>
+            )}
           </div>
-          <button {...stylex.props(s.iconButton)} aria-label="閉じる" onClick={close}>
+          <button {...stylex.props(s.iconButton)} aria-label="Close" onClick={close}>
             <X size={17} />
           </button>
         </div>
@@ -527,28 +551,29 @@ export default function App() {
           <>
             <p {...stylex.props(s.story)}>{activePlace.story}</p>
             <p {...stylex.props(s.helpFooter)}>
-              <Check size={12} /> この場所を、旅の手帖に記しました。
+              <Check size={12} /> Added to your travel journal.
             </p>
             <button {...stylex.props(s.action)} onClick={close}>
-              もう少し、歩いてみる
+              Keep exploring
             </button>
           </>
         )}
         {modal === 'help' && (
           <>
             <p {...stylex.props(s.story)}>
-              目的地も、制限時間もありません。
+              No deadlines. No need to hurry.
               <br />
-              気になる橋の向こうへ、のんびりと。
+              Start in the foothill town. Follow the red bridges north, through Cloudview Terrace,
+              to the floating village.
             </p>
             {[
-              { name: '歩く', keys: 'W A S D / 矢印キー' },
-              { name: '走る / 小さく跳ぶ', keys: 'Shift / Space' },
-              { name: '見回す / 近づく', keys: 'ドラッグ / スクロール' },
-              { name: '場所を調べる', keys: 'E' },
-              { name: '旅の手帖', keys: 'M' },
-              { name: '風景だけを楽しむ', keys: 'H' },
-              { name: '閉じる', keys: 'Esc' },
+              { name: 'Walk', keys: 'W A S D / Arrow keys' },
+              { name: 'Run / Hop', keys: 'Shift / Space' },
+              { name: 'Look around / Zoom', keys: 'Drag / Scroll' },
+              { name: 'Discover a place', keys: 'E' },
+              { name: 'Travel journal', keys: 'M' },
+              { name: 'Hide interface', keys: 'H' },
+              { name: 'Close', keys: 'Esc' },
             ].map((row) => (
               <div key={row.name} {...stylex.props(s.helpRow)}>
                 <span>{row.name}</span>
@@ -556,22 +581,22 @@ export default function App() {
               </div>
             ))}
             <p {...stylex.props(s.helpFooter)}>
-              スマートフォンでは、左下の矢印で歩き、画面をなぞって見回せます。
+              On mobile, use the arrows to walk and drag the scene to look around.
               <br />
-              カメラで旅の写真を保存。湯めぐりの記録はこのブラウザに残ります。
+              Use the camera to save a photo. Your discoveries are saved in this browser.
             </p>
             <button {...stylex.props(s.action)} onClick={close}>
-              散策をつづける
+              Continue exploring
             </button>
           </>
         )}
         {modal === 'journal' && (
           <>
             <p {...stylex.props(s.journalDesc)}>
-              {visited.length === 4
-                ? '四つの風景が、あなたの旅の記憶になりました。'
-                : '橋の向こうに、小さな発見が待っています。'}{' '}
-              {visited.length} / 4
+              {visited.length === places.length
+                ? 'Every place is now part of your journey.'
+                : 'A little discovery awaits across each bridge.'}{' '}
+              {visited.length} / {places.length}
             </p>
             {places.map((place) => (
               <div key={place.id} {...stylex.props(s.journalRow)}>
@@ -579,9 +604,12 @@ export default function App() {
                   {place.symbol}
                 </span>
                 <div>
-                  <h3 {...stylex.props(s.journalName)}>{place.name}</h3>
+                  <h3 {...stylex.props(s.journalName)}>{place.english}</h3>
+                  <p lang="ja" {...stylex.props(s.japaneseName, s.journalJapanese)}>
+                    {place.name}
+                  </p>
                   <p {...stylex.props(s.journalDesc)}>
-                    {visited.includes(place.id) ? place.description : 'まだ訪れていない風景'}
+                    {visited.includes(place.id) ? place.description : 'Waiting to be discovered'}
                   </p>
                 </div>
                 {visited.includes(place.id) && (
@@ -590,10 +618,10 @@ export default function App() {
               </div>
             ))}
             <p {...stylex.props(s.helpFooter)}>
-              場所の近くで E を押すか、「小さな寄り道」をタップすると記録できます。
+              Near a landmark, press E or tap the discovery prompt to add it to your journal.
             </p>
             <button {...stylex.props(s.action)} onClick={close}>
-              次の風景を探しに
+              Find your next discovery
             </button>
           </>
         )}

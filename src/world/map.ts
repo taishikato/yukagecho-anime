@@ -4,6 +4,7 @@ export interface Island {
   z: number;
   y: number;
   radius: number;
+  grounded?: boolean;
 }
 export interface Place {
   id: string;
@@ -21,20 +22,61 @@ export const islands: Island[] = [
   { id: 'onsen', x: 35, z: 7, y: 1, radius: 11 },
   { id: 'shrine', x: -33, z: -18, y: 2, radius: 10 },
   { id: 'inn', x: 2, z: -42, y: 4, radius: 14 },
+  { id: 'ground', x: 0, z: 140, y: -28, radius: 32, grounded: true },
+  { id: 'ascent', x: 0, z: 70, y: -14, radius: 10 },
 ];
+export const spawn = { x: 0, y: -27.85, z: 148 };
 export const connections = [
   [0, 1],
   [0, 2],
   [0, 3],
+  [4, 5],
+  [5, 0],
 ] as const;
 export const places: Place[] = [
   {
+    id: 'ground',
+    name: '麓の温泉街',
+    english: 'Foothill Onsen Town',
+    description: 'Every skyward journey begins on a lantern-lit street.',
+    story:
+      'Steam rises between timber inns and cherry trees at the foot of the mountain. Beyond the rooftops, red bridges climb into the clouds. Follow the main street north to begin the ascent.',
+    x: 0,
+    z: 146,
+    y: -28,
+    symbol: '街',
+  },
+  {
+    id: 'ground-bath',
+    name: '桜泉の湯',
+    english: 'Sakura Springs',
+    description: 'Warm water, falling petals, and the sky overhead.',
+    story:
+      'The oldest spring in the valley gathers beneath the cherry blossoms. Look up from the water: the lights of Yukagecho are already glowing in the sky. The red stairway leaves from the north end of town.',
+    x: 12,
+    z: 136,
+    y: -28,
+    symbol: '泉',
+  },
+  {
+    id: 'ascent',
+    name: '雲見の辻',
+    english: 'Cloudview Terrace',
+    description: 'The town below. A whole new world above.',
+    story:
+      'Halfway between earth and sky, travelers pause at this little teahouse. Follow the red bridge north to reach Yuakari Street, or turn south to return to the foothill town.',
+    x: 0,
+    z: 70,
+    y: -14,
+    symbol: '雲',
+  },
+  {
     id: 'town',
     name: '湯あかり通り',
-    english: 'YUAKARI STREET',
-    description: '軒先の灯りが、旅人を迎える。',
+    english: 'Yuakari Street',
+    description: 'Warm lanterns welcome the wandering traveler.',
     story:
-      '雲が茜に染まる頃、一つ、また一つと提灯が灯る。遠くで鳴る風鈴と、木の下駄の音。ここには、急ぐ理由がありません。',
+      'As the clouds turn rose-gold, paper lanterns glow one by one. Wind chimes ring in the distance, mingling with the soft clack of wooden sandals. Here, there is no reason to hurry.',
     x: 0,
     z: 9,
     y: 0,
@@ -43,10 +85,10 @@ export const places: Place[] = [
   {
     id: 'onsen',
     name: '雲渡りの湯',
-    english: 'KUMOWATARI ONSEN',
-    description: '湯けむりの向こうに、まだ知らない景色。',
+    english: 'Kumowatari Onsen',
+    description: 'Beyond the steam, a new view awaits.',
     story:
-      '千年ものあいだ、雲の上で湧き続ける青い湯。湯船の縁に腰かければ、空とお湯の境目が消えてゆく。深呼吸をひとつ、どうぞ。',
+      'For a thousand years, these blue springs have bubbled above the clouds. At the edge of the bath, the water seems to melt into the sky. Stay a moment. Take a breath.',
     x: 32,
     z: 12,
     y: 1,
@@ -55,10 +97,10 @@ export const places: Place[] = [
   {
     id: 'shrine',
     name: '風待ち神社',
-    english: 'KAZEMACHI SHRINE',
-    description: '願いごとは、風にあずけて。',
+    english: 'Kazemachi Shrine',
+    description: 'Let the wind carry your wishes.',
     story:
-      '空を渡る旅人が、無事を祈った小さな社。結ばれた願いは、風に乗ってどこへ行くのでしょう。桜の木だけが知っているのかもしれません。',
+      'A small shrine where skyward travelers once prayed for safe passage. Where do their wishes go when the wind carries them away? Perhaps only the cherry tree knows.',
     x: -30,
     z: -14,
     y: 2,
@@ -67,10 +109,10 @@ export const places: Place[] = [
   {
     id: 'inn',
     name: '望雲楼',
-    english: 'BOUNRO RYOKAN',
-    description: 'いちばん空に近い、旅の宿。',
+    english: 'Bounro Ryokan',
+    description: 'An inn a little closer to the sky.',
     story:
-      '幾重にも重なる屋根は、空へ続く階段のよう。今夜のお部屋からは、足もとを流れる雲海が見えます。旅の続きは、また明日。',
+      'Layer upon layer of tiled roofs rise like steps toward the sky. From the rooms of this traditional inn, a sea of clouds drifts far below. The rest of the journey can wait until tomorrow.',
     x: 2,
     z: -36,
     y: 4,

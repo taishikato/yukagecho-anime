@@ -4,12 +4,13 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildArchitecture, createTraveler, random } from './architecture';
-import { canWalk, nearestPlace, surfaceHeight } from './map';
+import { canWalk, nearestPlace, surfaceHeight, spawn } from './map';
 import type { Place } from './map';
 
 export interface WorldState {
   x: number;
   z: number;
+  y: number;
   yaw: number;
   place: Place;
   nearby: boolean;
@@ -31,10 +32,10 @@ export class WorldEngine {
   private traveler = createTraveler();
   private keys = new Set<string>();
   private yaw = 0.1;
-  private pitch = 0.38;
-  private distance = 58;
+  private pitch = 0.22;
+  private distance = 38;
   private pointer: { x: number; y: number; id: number } | null = null;
-  private position = new THREE.Vector3(0, 0.15, 12);
+  private position = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
   private time = 0;
   private jump = 0;
   private jumpSpeed = 0;
@@ -72,7 +73,7 @@ export class WorldEngine {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.domElement.setAttribute(
       'aria-label',
-      '雲海に浮かぶ湯影町の3D世界。WASDまたは矢印キーで移動、ドラッグで視点を変更。',
+      'Explore Yukagecho from its foothill hot springs to the floating village above. Move with WASD or arrow keys. Drag to look around.',
     );
     this.renderer.domElement.setAttribute('tabindex', '0');
     this.renderer.domElement.style.display = 'block';
@@ -95,14 +96,14 @@ export class WorldEngine {
     });
     this.light.shadow.bias = -0.0004;
     this.light.shadow.normalBias = 0.06;
-    this.scene.add(this.light);
+    this.scene.add(this.light, this.light.target);
     this.scene.add(this.objects.group, this.traveler.group);
     for (const z of [11, 4, -4, -11]) {
       const glow = new THREE.PointLight('#ffb65f', 3.5, 7, 2);
       glow.position.set(0, 2.3, z);
       this.scene.add(glow);
     }
-    this.camera.position.set(6, 20, 39);
+    this.camera.position.copy(this.position).add(new THREE.Vector3(0, 16, 30));
     this.focus.copy(this.position).add(new THREE.Vector3(6, 1.5, -8));
     this.camera.lookAt(this.focus);
 
@@ -165,9 +166,25 @@ export class WorldEngine {
       const sprite = new THREE.Sprite(material);
       const a = random() * Math.PI * 2,
         r = 35 + random() * 120;
-      sprite.position.set(Math.cos(a) * r, -12 - random() * 11, Math.sin(a) * r - 30);
+      sprite.position.set(Math.cos(a) * r, -12 - random() * 11, Math.sin(a) * r - 75);
       const s = 20 + random() * 36;
       sprite.scale.set(s * 2, s, 1);
+      this.scene.add(sprite);
+    }
+    // Cloud shelves beside the ascent reveal the valley through gaps.
+    for (let i = 0; i < 36; i++) {
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: cloudTexture,
+          color: '#ded3df',
+          transparent: true,
+          opacity: 0.42,
+          depthWrite: false,
+        }),
+      );
+      const side = i % 2 ? 1 : -1;
+      sprite.position.set(side * (18 + random() * 70), -18 + random() * 4, 12 + random() * 80);
+      sprite.scale.set(28 + random() * 22, 10 + random() * 9, 1);
       this.scene.add(sprite);
     }
     this.particlePositions = new Float32Array(180 * 3);
@@ -268,7 +285,7 @@ export class WorldEngine {
   };
   private contextLost = (event: Event) => {
     event.preventDefault();
-    this.callbacks.onError('3D描画が中断されました。ページを再読み込みしてください。');
+    this.callbacks.onError('3D rendering was interrupted. Please reload the page.');
     this.pause(true);
   };
   private pointerdown = (e: PointerEvent) => {
@@ -318,7 +335,7 @@ export class WorldEngine {
         dx /= len;
         dz /= len;
       }
-      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 4) * dt;
+      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 5) * dt;
       // Axis-separated collision gives wall sliding and prevents walking off islands.
       if (canWalk(this.position.x + dx * speed, this.position.z, this.objects.obstacles))
         this.position.x += dx * speed;
@@ -349,7 +366,7 @@ export class WorldEngine {
     this.traveler.ra.rotation.x = walk * 0.7;
     const target = this.position
       .clone()
-      .add(new THREE.Vector3(this.camera.aspect < 0.8 ? 0 : 12, 1.5, -8));
+      .add(new THREE.Vector3(this.camera.aspect < 0.8 ? 0 : 3, 1.5, -8));
     const smoothing = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 4);
     this.focus.lerp(target, smoothing);
     const offset = new THREE.Vector3(
@@ -386,6 +403,8 @@ export class WorldEngine {
       }
       this.particles.geometry.attributes.position.needsUpdate = true;
     }
+    this.light.position.copy(this.position).add(new THREE.Vector3(-25, 55, 30));
+    this.light.target.position.copy(this.position);
     this.composer.render();
     if (now - this.lastUpdate > 140) {
       this.lastUpdate = now;
@@ -397,6 +416,7 @@ export class WorldEngine {
     this.callbacks.onState({
       x: this.position.x,
       z: this.position.z,
+      y: this.position.y,
       yaw: this.yaw,
       paused: this.isPaused,
       place,
@@ -413,8 +433,8 @@ export class WorldEngine {
   }
   resetView() {
     this.yaw = 0.1;
-    this.pitch = 0.38;
-    this.distance = 58;
+    this.pitch = 0.22;
+    this.distance = 38;
   }
   setNight(value: boolean) {
     this.night = value;
@@ -432,7 +452,7 @@ export class WorldEngine {
     const blob = await new Promise<Blob | null>((resolve) =>
       this.renderer.domElement.toBlob(resolve, 'image/png'),
     );
-    if (!blob) throw new Error('写真を保存できませんでした。');
+    if (!blob) throw new Error('Your photo could not be saved.');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -1,3 +1,23 @@
+# Ground-to-sky experiment
+
+Branch: `experiment/ground-to-sky`, created from `main`.
+The existing English UI changes are included.
+
+[Open the experiment](https://yukagecho-ground-to-sky.taishi-k0903.workers.dev)
+
+Start in Foothill Onsen Town and walk north along the central street.
+Cross the red stair bridges through Cloudview Terrace to reach Yuakari Street and the original sky islands.
+All seven discoveries are reachable on foot, and the same route leads back to town.
+Sakura Springs is east of the main street.
+The UI is English, with Japanese place names beneath English headings.
+
+This branch deploys to the separate Cloudflare Worker `yukagecho-ground-to-sky`.
+The original `yukagecho-anime` Worker remains unchanged.
+The terrain, buildings, and traversal are procedural 3D, with the existing stylized art direction.
+The valley is bounded to the town and marked by low rails; distant woodland is scenery.
+
+---
+
 # 湯影町
 
 雲海に浮かぶ温泉街を、浴衣の旅人で歩くブラウザ向け3D散策アプリです。
@@ -75,7 +95,7 @@ npm run deploy
 
 ## 実装の範囲
 
-4つの散策可能な島と、遠景の浮島で構成される有限の世界です。
+地上の温泉街、中腹の展望所、4つの天空の島と遠景で構成される有限の世界です。
 旅館内部、入浴モーション、マルチプレイヤーは実装していません。
 進行に制限時間やゲームオーバーはありません。
 WebGL対応ブラウザが必要で、3D描画が利用できない場合は再読み込みの案内を表示します。

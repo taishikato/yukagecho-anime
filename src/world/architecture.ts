@@ -379,7 +379,78 @@ export function buildArchitecture(): WorldObjects {
         }
     }
   }
-  for (const i of islands) island(i.x, i.y, i.z, i.radius);
+  for (const i of islands) {
+    if (!i.grounded) island(i.x, i.y, i.z, i.radius);
+  }
+  // The valley is rooted in continuous land, with forested ridges behind the town.
+  b.box('moss', 0, -34, 150, 1600, 10, 1600);
+  b.add(new THREE.CylinderGeometry(32, 40, 9, 64), 'darkStone', 0, -32.5, 140);
+  b.add(new THREE.CylinderGeometry(32, 33, 0.4, 64), 'moss', 0, -28.2, 140);
+  for (let i = 0; i < 28; i++) {
+    const angle = (i / 28) * Math.PI * 2;
+    const xx = Math.cos(angle) * (65 + random() * 35);
+    const zz = 140 + Math.sin(angle) * 70;
+    if (zz < 100 && Math.abs(xx) < 45) continue;
+    b.ball('moss', xx, -34, zz, 20 + random() * 16, 15 + random() * 22, 24);
+    for (let j = 0; j < 3; j++) tree(xx + j * 4, -27, zz + j * 3, 2.5, false);
+  }
+  for (let i = 0; i < 80; i++) {
+    const x = (random() - 0.5) * 190;
+    const z = 45 + random() * 190;
+    if (Math.hypot(x, z - 140) < 39 || (Math.abs(x) < 9 && z < 110)) continue;
+    tree(x, -29, z, 1.5 + random() * 1.2, false);
+    b.ball('darkStone', x + 2, -29, z, 1.4, 0.8, 1.1);
+  }
+  // Low perimeter rails make the village boundary legible while leaving the ascent open.
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    const x = Math.cos(a) * 30.9,
+      z = 140 + Math.sin(a) * 30.9;
+    if (z < 112 && Math.abs(x) < 6) continue;
+    fence(x, -28, z, 4.9, -a - Math.PI / 2);
+  }
+  // Broad streets with an unobstructed northbound route into the sky.
+  for (let x = -29; x <= 29; x += 1.25)
+    for (let z = 110; z <= 169; z += 1.25) {
+      if (
+        Math.hypot(x, z - 140) < 31 &&
+        (Math.abs(x) < 3.8 || Math.abs(z - 136) < 3.8 || Math.abs(z - 153) < 3)
+      ) {
+        b.box(random() > 0.5 ? 'path' : 'path2', x, -27.94, z, 1.18, 0.15, 1.18);
+      }
+    }
+  for (const z of [119, 128, 145, 160]) {
+    house(-9, -28, z, 6.4, 5.1, z === 128 ? 3 : 2);
+    if (z !== 128) house(9, -28, z, 6.4, 5.1, 2);
+  }
+  house(-20, -28, 137, 7, 6, 3, true);
+  house(20, -28, 151, 7, 5, 3);
+  house(16, -28, 122, 7, 5, 2);
+  house(-17, -28, 153, 5, 4, 2);
+  for (const z of [113, 123, 133, 143, 153, 165])
+    for (const x of [-4.2, 4.2]) lantern(x, -28, z, true);
+  for (const [x, z] of [
+    [-25, 144],
+    [-20, 121],
+    [24, 137],
+    [20, 160],
+    [-9, 166],
+    [25, 148],
+  ])
+    tree(x, -28, z, 2.6);
+  for (const z of [136, 154]) {
+    for (const x of [-5, 5]) b.box('timber', x, -25, z, 0.13, 6, 0.13);
+    b.beam('timber', vec(-5, -22.5, z), vec(5, -22.5, z), 0.035);
+    for (let x = -4; x <= 4; x += 1.3) lantern(x, -23.1, z);
+  }
+  // Midway tea terrace marks the transition from grounded town to sky.
+  house(-5, -14, 70, 3.7, 4, 1);
+  tree(5.5, -14, 73, 1.9);
+  fence(-5.5, -14, 76, 4, 0, true);
+  fence(5.5, -14, 76, 4, 0, true);
+  // Leave the central bridge approach open.
+  fence(-7, -28, 113, 6, 0, true);
+  fence(7, -28, 113, 6, 0, true);
   // A dense, layered village with a clear walkable central street.
   house(-7.6, 0, 6, 5.3, 4.6, 2);
   house(7.6, 0, 5.5, 5.4, 4.6, 2);
@@ -428,6 +499,22 @@ export function buildArchitecture(): WorldObjects {
   water.position.set(poolX, poolY + 0.27, poolZ);
   waters.push(water);
   b.group.add(water);
+  const valleyWater = new THREE.Mesh(
+    water.geometry.clone(),
+    (water.material as THREE.ShaderMaterial).clone(),
+  );
+  valleyWater.rotation.x = -Math.PI / 2;
+  valleyWater.position.set(18, -27.55, 136);
+  waters.push(valleyWater);
+  b.group.add(valleyWater);
+  obstacles.push({ x: 18, z: 136, halfX: 4.1, halfZ: 4.1 });
+  b.add(new THREE.CylinderGeometry(4.8, 4.8, 0.5, 40), 'darkStone', 18, -27.9, 136);
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    b.ball('stone', 18 + Math.cos(a) * 4.5, -27.5, 136 + Math.sin(a) * 4.5, 0.65, 0.55, 0.65);
+  }
+  steamSources.push(vec(16, -27.5, 136), vec(20, -27.5, 137), vec(18, -27.5, 134));
+
   steamSources.push(
     vec(poolX - 2, 1.6, poolZ),
     vec(poolX + 2, 1.6, poolZ),
@@ -545,6 +632,10 @@ export function buildArchitecture(): WorldObjects {
     ['雲渡りの湯', 30, 1, 12],
     ['風待ち神社', -28, 2, -14],
     ['望雲楼', 5, 4, -36],
+    ['天空への道', 3.7, -28, 115],
+    ['麓の温泉街', 3.7, -28, 146],
+    ['桜泉の湯', 12, -28, 138],
+    ['雲見の辻', 3, -14, 70],
   ] as const) {
     const canvas = document.createElement('canvas');
     canvas.width = 128;
