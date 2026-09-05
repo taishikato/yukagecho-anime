@@ -22,7 +22,11 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 700,
       rollupOptions: {
         output: {
-          manualChunks: (id) => (id.includes('node_modules/three/') ? 'three' : undefined),
+          manualChunks: (id) => {
+            if (id.includes('node_modules/three/')) return 'three';
+            if (id.includes('node_modules/posthog-js/') || id.includes('node_modules/@posthog/'))
+              return 'posthog';
+          },
         },
       },
     },

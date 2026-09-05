@@ -23,6 +23,7 @@ import { islands, connections, places, spawn, interactionAt } from './world/map'
 import type { Place } from './world/map';
 import type { WorldEngine, WorldState } from './world/engine';
 import { Soundscape } from './world/audio';
+import { captureEvent } from './lib/analytics';
 
 type Modal = 'help' | 'journal' | 'place' | 'registration' | null;
 const SAVE_KEY = 'yukagecho.visits.v1';
@@ -204,10 +205,12 @@ export default function App() {
     const current = stateRef.current;
     if (!current.interaction) return;
     if (current.interaction.kind === 'registration') {
+      captureEvent('registration_opened');
       setModal('registration');
       return;
     }
     const place = current.interaction.place;
+    captureEvent('place_explored', { place_id: place.id });
     setActivePlace(place);
     setModal('place');
     setVisited((old) => {
@@ -301,6 +304,7 @@ export default function App() {
   const takePhoto = async () => {
     try {
       await engine.current?.takePhoto();
+      captureEvent('photo_saved');
       notify('Your travel photo has been saved.');
     } catch {
       notify('Your photo could not be saved.');
@@ -310,6 +314,7 @@ export default function App() {
     const next = !night;
     setNight(next);
     engine.current?.setNight(next);
+    captureEvent('time_changed', { night: next });
     notify(next ? 'Night falls over Yukagecho.' : 'Welcome to Yukagecho at dusk.');
   };
   const close = () => setModal(null);

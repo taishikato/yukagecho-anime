@@ -1,6 +1,9 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './global.css';
+import { initAnalytics } from './lib/analytics';
+
+initAnalytics();
 
 if (import.meta.env.DEV) {
   // @ts-expect-error StyleX exposes this virtual module through its Vite plugin.

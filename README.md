@@ -84,6 +84,8 @@ E2Eテストはインストール済みのGoogle Chromeを使います。
 
 ## Cloudflareへの公開
 
+現在の公開先は `wrangler.jsonc` の `anime` Workerです。
+
 ```sh
 npx wrangler login
 npm run deploy:check
@@ -92,6 +94,17 @@ npm run deploy
 
 `wrangler.jsonc` でWorker名とSPAの配信を設定しています。
 必要な公開アセットだけを `dist/` に出力し、ソースコード・設計画像・テストは配信しません。
+
+## PostHog
+
+[Yukagechoプロジェクト](https://us.posthog.com/project/595155/home) に本番ビルドのページ閲覧・離脱と `place_explored`、`registration_opened`、`photo_saved`、`time_changed` を送信します。
+`.env.production` に公開用の書き込み専用プロジェクトトークンを保存しているため、通常の `npm run deploy` で計測も有効になります。
+別プロジェクトに切り替える場合はビルド時の `VITE_POSTHOG_KEY` を変更してください。
+個人用APIキーや秘密鍵は設定しないでください。
+開発サーバーでは計測せず、キー未設定時も散策は動作します。
+フォームの自動収集、人物プロフィール、セッション録画は無効です。
+認証コールバックの漏洩を防ぐため、イベント内のURLからクエリとフラグメントを除去します。
+外部スクリプトを読み込まないSDKを使い、CSPはPostHogのUS送信先への接続だけを許可しています。
 
 ## 実装の範囲
 
