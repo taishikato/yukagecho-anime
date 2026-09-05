@@ -23,7 +23,7 @@ The valley is bounded to the town and marked by low rails; distant woodland is s
 雲海に浮かぶ温泉街を、浴衣の旅人で歩くブラウザ向け3D散策アプリです。
 朱塗りの橋でつながった4つの浮島に、湯あかり通り、雲渡りの湯、風待ち神社、望雲楼があります。
 
-[公開サイトを開く](https://yukagecho-anime.taishi-k0903.workers.dev)
+[公開サイトを開く](https://anime.yukagecho.workers.dev)
 
 ## 開発
 
@@ -99,3 +99,10 @@ npm run deploy
 旅館内部、入浴モーション、マルチプレイヤーは実装していません。
 進行に制限時間やゲームオーバーはありません。
 WebGL対応ブラウザが必要で、3D描画が利用できない場合は再読み込みの案内を表示します。
+
+## 町民登録
+
+開始地点の人物の隣にある和風の木製看板をEキーで調べると、メール認証とusername予約へ進めます。
+ゲストの初回表示ではモーダルを開かず、初回ログイン後はusername取得画面を自動表示します。
+本番Supabaseへのマイグレーションは適用済みで、メール配信はカスタムSMTPとOTPテンプレートの設定待ちです。
+設定状況と検証方法は [町民登録の運用メモ](docs/resident-registration.md) を参照してください。

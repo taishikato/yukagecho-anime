@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { islands, connections } from './map';
+import { islands, connections, registrationSign } from './map';
 import type { Obstacle } from './map';
 
 let seed = 721;
@@ -665,6 +665,56 @@ export function buildArchitecture(): WorldObjects {
     b.group.add(sign);
     b.box('timber', x, y + 1.8, z, 0.64, 2.7, 0.12);
     b.box('timber', x, y + 0.6, z, 0.12, 1.2, 0.12);
+  }
+  // A roofed wooden notice board beside the arriving traveler.
+  {
+    const { x, y, z } = registrationSign;
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#bc915c';
+    ctx.fillRect(0, 0, 768, 1024);
+    // Fine, uneven grain and plank seams keep the face wooden rather than poster-like.
+    for (let i = 0; i < 95; i++) {
+      const row = i * 11;
+      ctx.strokeStyle = i % 3 ? '#996a3633' : '#e8c68b44';
+      ctx.lineWidth = 1 + (i % 3);
+      ctx.beginPath();
+      ctx.moveTo(0, row);
+      ctx.bezierCurveTo(210, row + Math.sin(i) * 9, 540, row - 6, 768, row + 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#75502b66';
+    for (const row of [256, 512, 768]) ctx.fillRect(0, row, 768, 3);
+    ctx.strokeStyle = '#654125';
+    ctx.lineWidth = 12;
+    ctx.strokeRect(22, 22, 724, 980);
+    ctx.fillStyle = '#35291e';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 54px Georgia, serif';
+    ctx.fillText('Resident', 384, 112);
+    ctx.fillText('Registration', 384, 180);
+    ctx.font = 'bold 132px "Noto Serif JP", serif';
+    [...'町民登録'].forEach((letter, i) => ctx.fillText(letter, 384, 370 + i * 148));
+    ctx.font = '36px Georgia, serif';
+    ctx.fillText('Reserve your username', 384, 948);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.65, 2.2),
+      new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }),
+    );
+    sign.position.set(x, y + 1.95, z + 0.15);
+    b.group.add(sign);
+    b.box('timber', x, y + 1.95, z, 1.8, 2.35, 0.26);
+    for (const dx of [-0.96, 0.96]) {
+      b.box('timber', x + dx, y + 1.55, z, 0.18, 3.1, 0.22);
+      b.box('stone', x + dx, y + 0.13, z, 0.38, 0.26, 0.42);
+    }
+    b.box('timber', x, y + 0.65, z, 2.1, 0.16, 0.26);
+    roof(x, y + 3.16, z, 2.4, 1);
+    obstacles.push({ x, z, halfX: 1.15, halfZ: 0.22 });
   }
   return { group: b.finish(), obstacles, waters, steamSources };
 }

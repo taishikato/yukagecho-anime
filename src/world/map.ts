@@ -26,6 +26,15 @@ export const islands: Island[] = [
   { id: 'ascent', x: 0, z: 70, y: -14, radius: 10 },
 ];
 export const spawn = { x: 0, y: -27.85, z: 148 };
+export const registrationSign = { x: -2.5, y: -28, z: 148, radius: 2.8 };
+export type InteractionTarget = { kind: 'registration' } | { kind: 'discovery'; place: Place };
+
+export function interactionAt(x: number, z: number): InteractionTarget | null {
+  if (Math.hypot(x - registrationSign.x, z - registrationSign.z) < registrationSign.radius)
+    return { kind: 'registration' };
+  const place = nearestPlace(x, z);
+  return Math.hypot(x - place.x, z - place.z) < 4.3 ? { kind: 'discovery', place } : null;
+}
 export const connections = [
   [0, 1],
   [0, 2],

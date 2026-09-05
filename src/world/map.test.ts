@@ -31,3 +31,15 @@ describe('walkable sky village', () => {
     expect(surfaceHeight(19, 19)).toBeNull();
   });
 });
+
+describe('registration interaction', () => {
+  it('prioritizes the sign without changing discovery locations', async () => {
+    const { interactionAt, registrationSign, spawn } = await import('./map');
+    expect(places).toHaveLength(7);
+    expect(interactionAt(registrationSign.x, registrationSign.z)?.kind).toBe('registration');
+    expect(interactionAt(spawn.x, spawn.z)?.kind).toBe('registration');
+    expect(interactionAt(0, 146)?.kind).toBe('discovery');
+    expect(interactionAt(0, 145.15)?.kind).toBe('discovery');
+    expect(interactionAt(100, 100)).toBeNull();
+  });
+});

@@ -4,7 +4,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildArchitecture, createTraveler, random } from './architecture';
-import { canWalk, nearestPlace, surfaceHeight, spawn } from './map';
+import { canWalk, nearestPlace, surfaceHeight, spawn, interactionAt } from './map';
+import type { InteractionTarget } from './map';
 import type { Place } from './map';
 
 export interface WorldState {
@@ -14,6 +15,7 @@ export interface WorldState {
   yaw: number;
   place: Place;
   nearby: boolean;
+  interaction: InteractionTarget | null;
   paused: boolean;
 }
 interface Callbacks {
@@ -247,7 +249,12 @@ export class WorldEngine {
     this.composer.setSize(w, h);
   };
   private keydown = (event: KeyboardEvent) => {
-    if ((event.target as HTMLElement).closest('input,textarea,dialog,[role="dialog"]')) return;
+    if (
+      (event.target as HTMLElement).closest(
+        'input,textarea,select,dialog,[role="dialog"],[contenteditable]:not([contenteditable="false"])',
+      )
+    )
+      return;
     if (
       (event.target as HTMLElement).closest('button') &&
       ['Space', 'Enter', 'KeyE'].includes(event.code)
@@ -307,6 +314,7 @@ export class WorldEngine {
   };
   private wheel = (e: WheelEvent) => {
     e.preventDefault();
+    if (this.isPaused) return;
     this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.018, 10, 65);
   };
 
@@ -420,6 +428,7 @@ export class WorldEngine {
       yaw: this.yaw,
       paused: this.isPaused,
       place,
+      interaction: interactionAt(this.position.x, this.position.z),
       nearby: Math.hypot(this.position.x - place.x, this.position.z - place.z) < 4.3,
     });
   }

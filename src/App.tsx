@@ -18,12 +18,13 @@ import {
   X,
 } from 'lucide-react';
 import { s } from './styles';
-import { islands, connections, places, spawn } from './world/map';
+import { Registration } from './features/residency/Registration';
+import { islands, connections, places, spawn, interactionAt } from './world/map';
 import type { Place } from './world/map';
 import type { WorldEngine, WorldState } from './world/engine';
 import { Soundscape } from './world/audio';
 
-type Modal = 'help' | 'journal' | 'place' | null;
+type Modal = 'help' | 'journal' | 'place' | 'registration' | null;
 const SAVE_KEY = 'yukagecho.visits.v1';
 function savedVisits(): string[] {
   try {
@@ -193,6 +194,7 @@ export default function App() {
     yaw: 0.17,
     place: places[0],
     nearby: true,
+    interaction: interactionAt(spawn.x, spawn.z),
     paused: false,
   });
   const stateRef = useRef(state),
@@ -200,12 +202,17 @@ export default function App() {
   const notify = useCallback((text: string) => setToast(text), []);
   const interact = useCallback(() => {
     const current = stateRef.current;
-    if (!current.nearby) return;
-    setActivePlace(current.place);
+    if (!current.interaction) return;
+    if (current.interaction.kind === 'registration') {
+      setModal('registration');
+      return;
+    }
+    const place = current.interaction.place;
+    setActivePlace(place);
     setModal('place');
     setVisited((old) => {
-      if (old.includes(current.place.id)) return old;
-      const next = [...old, current.place.id];
+      if (old.includes(place.id)) return old;
+      const next = [...old, place.id];
       try {
         localStorage.setItem(SAVE_KEY, JSON.stringify(next));
       } catch {
@@ -257,7 +264,7 @@ export default function App() {
       dialog.current?.close();
       container.current?.querySelector('canvas')?.focus({ preventScroll: true });
     }
-  }, [modal]);
+  }, [modal, ready]);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(''), 4000);
@@ -265,11 +272,18 @@ export default function App() {
   }, [toast]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest('input,textarea')) return;
       if (event.code === 'Escape') {
         setModal(null);
         setHideUI(false);
+        return;
       }
+      if (
+        (event.target as HTMLElement).closest(
+          'input,textarea,select,dialog,[role="dialog"],[contenteditable]:not([contenteditable="false"])',
+        )
+      )
+        return;
+      if (modal) return;
       if (event.code === 'KeyM' && !event.repeat)
         setModal((old) => (old === 'journal' ? null : 'journal'));
       if (event.code === 'KeyH' && !event.repeat && !modal) setHideUI((old) => !old);
@@ -299,6 +313,7 @@ export default function App() {
     notify(next ? 'Night falls over Yukagecho.' : 'Welcome to Yukagecho at dusk.');
   };
   const close = () => setModal(null);
+  const requireUsername = useCallback(() => setModal('registration'), []);
   return (
     <main {...stylex.props(s.app)}>
       <div
@@ -383,25 +398,31 @@ export default function App() {
             </div>
             <p {...stylex.props(s.placeDescription)}>{state.place.description}</p>
           </section>
-          {ready && state.nearby && !modal && (
+          {ready && state.interaction && !modal && (
             <button {...stylex.props(s.interact)} onClick={interact}>
               <kbd {...stylex.props(s.key)}>E</kbd>
               <span>
                 <span {...stylex.props(s.interactSub)}>
-                  {visited.includes(state.place.id) ? 'A TRAVEL MEMORY' : 'A LITTLE DISCOVERY'}
+                  {state.interaction?.kind === 'registration'
+                    ? 'RESIDENT REGISTRATION'
+                    : visited.includes(state.place.id)
+                      ? 'A TRAVEL MEMORY'
+                      : 'A LITTLE DISCOVERY'}
                 </span>
                 <span {...stylex.props(s.interactTitle)}>
-                  {state.place.id === 'onsen'
-                    ? 'Pause by the hot springs'
-                    : state.place.id === 'shrine'
-                      ? 'Leave a wish on the wind'
-                      : state.place.id === 'inn'
-                        ? 'Visit the ryokan'
-                        : state.place.id === 'ascent'
-                          ? 'Take in the view'
-                          : state.place.id === 'ground-bath'
-                            ? 'Visit the springs'
-                            : 'Follow the lanterns'}
+                  {state.interaction?.kind === 'registration'
+                    ? 'Read the notice'
+                    : state.place.id === 'onsen'
+                      ? 'Pause by the hot springs'
+                      : state.place.id === 'shrine'
+                        ? 'Leave a wish on the wind'
+                        : state.place.id === 'inn'
+                          ? 'Visit the ryokan'
+                          : state.place.id === 'ascent'
+                            ? 'Take in the view'
+                            : state.place.id === 'ground-bath'
+                              ? 'Visit the springs'
+                              : 'Follow the lanterns'}
                 </span>
               </span>
               <ChevronRight size={15} />
@@ -508,6 +529,24 @@ export default function App() {
         {...stylex.props(s.dialog)}
         aria-labelledby="dialog-title"
         onCancel={close}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return;
+          const focusable = [
+            ...event.currentTarget.querySelectorAll<HTMLElement>(
+              'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])',
+            ),
+          ].filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
+          const first = focusable[0],
+            last = focusable[focusable.length - 1];
+          if (!first) return;
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             const r = e.currentTarget.getBoundingClientRect();
@@ -524,19 +563,28 @@ export default function App() {
         <div {...stylex.props(s.dialogTop)}>
           <div>
             <span {...stylex.props(s.smallText)}>
-              {modal === 'place'
-                ? 'A PLACE TO REMEMBER'
-                : modal === 'journal'
-                  ? 'A LITTLE TRAVEL JOURNAL'
-                  : 'TAKE YOUR TIME'}
+              {modal === 'registration'
+                ? 'MAKE YOURSELF AT HOME'
+                : modal === 'place'
+                  ? 'A PLACE TO REMEMBER'
+                  : modal === 'journal'
+                    ? 'A LITTLE TRAVEL JOURNAL'
+                    : 'TAKE YOUR TIME'}
             </span>
             <h2 id="dialog-title" {...stylex.props(s.dialogTitle)}>
-              {modal === 'place'
-                ? activePlace.english
-                : modal === 'journal'
-                  ? 'Travel journal'
-                  : 'How to explore'}
+              {modal === 'registration'
+                ? 'Resident Registration'
+                : modal === 'place'
+                  ? activePlace.english
+                  : modal === 'journal'
+                    ? 'Travel journal'
+                    : 'How to explore'}
             </h2>
+            {modal === 'registration' && (
+              <p lang="ja" {...stylex.props(s.japaneseName)}>
+                町民登録所
+              </p>
+            )}
             {modal === 'place' && (
               <p lang="ja" {...stylex.props(s.japaneseName)}>
                 {activePlace.name}
@@ -547,6 +595,11 @@ export default function App() {
             <X size={17} />
           </button>
         </div>
+        <Registration
+          active={modal === 'registration'}
+          onClose={close}
+          onRequireUsername={requireUsername}
+        />
         {modal === 'place' && (
           <>
             <p {...stylex.props(s.story)}>{activePlace.story}</p>

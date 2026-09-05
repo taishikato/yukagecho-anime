@@ -6,6 +6,12 @@ test('exploration, journal persistence, camera, audio, night and photo', async (
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
   await page.locator('canvas').focus();
+  await page.keyboard.down('w');
+  try {
+    await expect(page.getByRole('button', { name: /Follow the lanterns/ })).toBeVisible();
+  } finally {
+    await page.keyboard.up('w');
+  }
   await page.keyboard.press('e');
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toContainText('Added to your travel journal');
@@ -138,6 +144,7 @@ test('walks from the ground to the sky and completes the seven-place journal', a
     ).toBeVisible();
     await page.keyboard.press('Escape');
   }
+  await walkTo(0, 145);
   await discover('Foothill Onsen Town');
   await walkTo(0, 136);
   await walkTo(12, 136);
