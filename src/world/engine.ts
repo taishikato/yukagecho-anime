@@ -377,7 +377,7 @@ export class WorldEngine {
         dx /= len;
         dz /= len;
       }
-      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 6) * dt;
+      const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 11.25 : 9) * dt;
       // Axis-separated collision gives wall sliding and prevents walking off islands.
       if (
         canWalk(
@@ -416,7 +416,7 @@ export class WorldEngine {
       );
       this.traveler.group.rotation.y += delta * Math.min(1, dt * 12);
     }
-    const walk = moving ? Math.sin(this.time * 11) * 0.45 : 0;
+    const walk = moving ? Math.sin(this.time * 16.5) * 0.45 : 0;
     this.traveler.left.rotation.x = walk;
     this.traveler.right.rotation.x = -walk;
     this.traveler.la.rotation.x = -walk * 0.7;
