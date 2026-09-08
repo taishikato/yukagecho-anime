@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { weatherSurface } from './surfaces';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildArchitecture, createTraveler, random } from './architecture';
 import { canWalk, nearestPlace, surfaceHeight, spawn, interactionAt } from './map';
@@ -27,15 +29,26 @@ interface Callbacks {
 
 export class WorldEngine {
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(48, 1, 0.2, 650);
+  private camera = new THREE.PerspectiveCamera(55, 1, 0.2, 650);
   private renderer: THREE.WebGLRenderer;
   private composer: EffectComposer;
   private objects = buildArchitecture();
   private traveler = createTraveler();
+  private cameraWalls = this.objects.obstacles
+    .filter((o) => o.height !== undefined)
+    .map(
+      (o) =>
+        new THREE.Box3(
+          new THREE.Vector3(o.x - o.halfX - 0.7, o.baseY ?? 0, o.z - o.halfZ - 0.7),
+          new THREE.Vector3(o.x + o.halfX + 0.7, (o.baseY ?? 0) + o.height!, o.z + o.halfZ + 0.7),
+        ),
+    );
+  private cameraRay = new THREE.Ray();
+  private cameraHit = new THREE.Vector3();
   private keys = new Set<string>();
   private yaw = 0.1;
-  private pitch = 0.22;
-  private distance = 38;
+  private pitch = 0.24;
+  private distance = 32;
   private pointer: { x: number; y: number; id: number } | null = null;
   private position = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
   private time = 0;
@@ -75,14 +88,14 @@ export class WorldEngine {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.domElement.setAttribute(
       'aria-label',
-      'Explore Yukagecho from its foothill hot springs to the floating village above. Move with WASD or arrow keys. Drag to look around.',
+      'Explore the grand floating island of Yukagecho, its lantern canal, hot springs and ryokan. Move with WASD or arrow keys. Drag to look around.',
     );
     this.renderer.domElement.setAttribute('tabindex', '0');
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.touchAction = 'none';
     container.appendChild(this.renderer.domElement);
     this.scene.background = new THREE.Color('#a9b2c6');
-    this.scene.fog = new THREE.FogExp2('#b0aebf', 0.0043);
+    this.scene.fog = new THREE.FogExp2('#b0aebf', 0.0028);
     this.scene.add(new THREE.HemisphereLight('#b7d8f0', '#8b6e70', 1.3));
     this.light = new THREE.DirectionalLight('#ffd5a6', 2.3);
     this.light.position.set(-25, 45, 30);
@@ -167,26 +180,10 @@ export class WorldEngine {
       });
       const sprite = new THREE.Sprite(material);
       const a = random() * Math.PI * 2,
-        r = 35 + random() * 120;
-      sprite.position.set(Math.cos(a) * r, -12 - random() * 11, Math.sin(a) * r - 75);
+        r = 62 + random() * 125;
+      sprite.position.set(Math.cos(a) * r, -16 - random() * 16, Math.sin(a) * r - 25);
       const s = 20 + random() * 36;
       sprite.scale.set(s * 2, s, 1);
-      this.scene.add(sprite);
-    }
-    // Cloud shelves beside the ascent reveal the valley through gaps.
-    for (let i = 0; i < 36; i++) {
-      const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: cloudTexture,
-          color: '#ded3df',
-          transparent: true,
-          opacity: 0.42,
-          depthWrite: false,
-        }),
-      );
-      const side = i % 2 ? 1 : -1;
-      sprite.position.set(side * (18 + random() * 70), -18 + random() * 4, 12 + random() * 80);
-      sprite.scale.set(28 + random() * 22, 10 + random() * 9, 1);
       this.scene.add(sprite);
     }
     this.particlePositions = new Float32Array(180 * 3);
@@ -223,7 +220,45 @@ export class WorldEngine {
     canvas.addEventListener('wheel', this.wheel, { passive: false });
     canvas.addEventListener('webglcontextlost', this.contextLost);
     this.frame = requestAnimationFrame(this.animate);
-    callbacks.onReady();
+    new GLTFLoader().load(
+      '/models/bounro-ryokan.glb',
+      (gltf) => {
+        if (this.disposed) {
+          gltf.scene.traverse((object) => {
+            if (!(object instanceof THREE.Mesh)) return;
+            object.geometry.dispose();
+            for (const material of Array.isArray(object.material)
+              ? object.material
+              : [object.material])
+              material.dispose();
+          });
+          return;
+        }
+        gltf.scene.name = 'Bounro Ryokan - Blender';
+        gltf.scene.position.set(0, 6, -35);
+        gltf.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true;
+            object.receiveShadow = true;
+            for (const material of Array.isArray(object.material)
+              ? object.material
+              : [object.material]) {
+              if (material instanceof THREE.MeshStandardMaterial && /cedar/i.test(material.name))
+                weatherSurface(material, 'wood');
+            }
+          }
+        });
+        this.scene.add(gltf.scene);
+        callbacks.onReady();
+      },
+      undefined,
+      () => {
+        if (!this.disposed) {
+          this.pause(true);
+          callbacks.onError('The ryokan model could not load. Please reload the page.');
+        }
+      },
+    );
   }
 
   private makeCloudTexture() {
@@ -315,7 +350,7 @@ export class WorldEngine {
   private wheel = (e: WheelEvent) => {
     e.preventDefault();
     if (this.isPaused) return;
-    this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.018, 10, 65);
+    this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.018, 10, 100);
   };
 
   private animate = (now: number) => {
@@ -345,9 +380,23 @@ export class WorldEngine {
       }
       const speed = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 7.5 : 6) * dt;
       // Axis-separated collision gives wall sliding and prevents walking off islands.
-      if (canWalk(this.position.x + dx * speed, this.position.z, this.objects.obstacles))
+      if (
+        canWalk(
+          this.position.x + dx * speed,
+          this.position.z,
+          this.objects.obstacles,
+          this.position.y,
+        )
+      )
         this.position.x += dx * speed;
-      if (canWalk(this.position.x, this.position.z + dz * speed, this.objects.obstacles))
+      if (
+        canWalk(
+          this.position.x,
+          this.position.z + dz * speed,
+          this.objects.obstacles,
+          this.position.y,
+        )
+      )
         this.position.z += dz * speed;
       this.position.y = surfaceHeight(this.position.x, this.position.z) ?? this.position.y;
       if (this.jumpSpeed !== 0 || this.jump > 0) {
@@ -372,17 +421,32 @@ export class WorldEngine {
     this.traveler.right.rotation.x = -walk;
     this.traveler.la.rotation.x = -walk * 0.7;
     this.traveler.ra.rotation.x = walk * 0.7;
+    const inCanal =
+      this.position.x > 14 && this.position.x < 30 && this.position.z > -35 && this.position.z < 12;
     const target = this.position
       .clone()
-      .add(new THREE.Vector3(this.camera.aspect < 0.8 ? 0 : 3, 1.5, -8));
+      .add(new THREE.Vector3(0, inCanal ? 2 : 1.5, inCanal ? -1 : -4));
     const smoothing = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 4);
     this.focus.lerp(target, smoothing);
+    const distance = inCanal ? Math.max(4, this.distance - 20) : this.distance;
+    const pitch = this.pitch;
     const offset = new THREE.Vector3(
-      Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance,
-      Math.sin(this.pitch) * this.distance,
-      Math.cos(this.yaw) * Math.cos(this.pitch) * this.distance,
+      Math.sin(this.yaw) * Math.cos(pitch) * distance,
+      Math.sin(pitch) * distance,
+      Math.cos(this.yaw) * Math.cos(pitch) * distance,
     );
-    this.camera.position.lerp(this.focus.clone().add(offset), smoothing);
+    this.cameraRay.set(this.focus, offset.clone().normalize());
+    let clearDistance = distance;
+    for (const wall of this.cameraWalls) {
+      if (this.cameraRay.intersectBox(wall, this.cameraHit))
+        clearDistance = Math.min(
+          clearDistance,
+          Math.max(1.5, this.cameraHit.distanceTo(this.focus) - 0.5),
+        );
+    }
+    // Resolve obstruction immediately; ease back out after leaving the building.
+    const desiredCamera = this.focus.clone().add(offset.setLength(clearDistance));
+    this.camera.position.lerp(desiredCamera, clearDistance < distance ? 1 : smoothing);
     this.camera.lookAt(this.focus);
     const t = this.reducedMotion ? 0 : this.time;
     for (const s of this.steam) {
@@ -442,8 +506,8 @@ export class WorldEngine {
   }
   resetView() {
     this.yaw = 0.1;
-    this.pitch = 0.22;
-    this.distance = 38;
+    this.pitch = 0.24;
+    this.distance = 32;
   }
   setNight(value: boolean) {
     this.night = value;

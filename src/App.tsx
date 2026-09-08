@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { s } from './styles';
 import { Registration } from './features/residency/Registration';
-import { islands, connections, places, spawn, interactionAt } from './world/map';
+import { islands, walkways, canal, terrace, places, spawn, interactionAt } from './world/map';
 import type { Place } from './world/map';
 import type { WorldEngine, WorldState } from './world/engine';
 import { Soundscape } from './world/audio';
@@ -53,9 +53,9 @@ function OnsenMark() {
   );
 }
 function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
-  const scale = 0.7;
+  const scale = 1.42;
   const px = (x: number) => 100 + x * scale,
-    pz = (z: number) => 63 + z * scale;
+    pz = (z: number) => 100 + z * scale;
   return (
     <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden="true">
       <defs>
@@ -86,17 +86,6 @@ function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
         strokeWidth=".5"
       />
       <g clipPath="url(#mapClip)">
-        {connections.map(([a, b]) => (
-          <line
-            key={`${a}-${b}`}
-            x1={px(islands[a].x)}
-            y1={pz(islands[a].z)}
-            x2={px(islands[b].x)}
-            y2={pz(islands[b].z)}
-            stroke="#b97a5b"
-            strokeWidth="4"
-          />
-        ))}
         {islands.map((i) => (
           <g key={i.id}>
             <ellipse
@@ -115,19 +104,58 @@ function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
             />
           </g>
         ))}
-        {[-11, -4, 4, 11].map((z, i) => (
+        <rect
+          x={px(terrace.x - terrace.halfX)}
+          y={pz(terrace.z - terrace.halfZ)}
+          width={terrace.halfX * 2 * scale}
+          height={terrace.halfZ * 2 * scale}
+          rx="3"
+          fill="#77816a"
+        />
+        <path
+          d={`M${px(0)},${pz(48)}V${pz(-23)}M${px(-44)},${pz(16)}H${px(44)}M${px(-44)},${pz(-12)}H${px(44)}`}
+          stroke="#b3a78a"
+          strokeWidth="3"
+          fill="none"
+        />
+        <rect
+          x={px(canal.x - canal.width / 2)}
+          y={pz(canal.z - canal.length / 2)}
+          width={canal.width * scale}
+          height={canal.length * scale}
+          fill="#3b8895"
+        />
+        {walkways.map((w) => (
+          <line
+            key={w.id}
+            x1={px(w.ax)}
+            y1={pz(w.az)}
+            x2={px(w.bx)}
+            y2={pz(w.bz)}
+            stroke="#d28a65"
+            strokeWidth="3"
+          />
+        ))}
+        {[36, 25, 6, -4].map((z) => (
           <g key={z}>
-            <rect
-              x={px(-9)}
-              y={pz(z) - 3}
-              width="7"
-              height="6"
-              fill={i % 2 ? '#bd9774' : '#809088'}
-              transform={`rotate(-6 ${px(-9)} ${pz(z)})`}
-            />
-            <rect x={px(6)} y={pz(z) - 3} width="7" height="6" fill="#ab9476" />
+            <rect x={px(-12)} y={pz(z - 3)} width="9" height="8" fill="#bd9774" />
+            <rect x={px(6)} y={pz(z - 3)} width="9" height="8" fill="#ab9476" />
           </g>
         ))}
+        {[-30, -21, -3, 7].map((z) => (
+          <g key={z}>
+            <rect x={px(8)} y={pz(z - 3)} width="8" height="8" fill="#a98a6e" />
+            <rect x={px(30)} y={pz(z - 3)} width="8" height="8" fill="#a98a6e" />
+          </g>
+        ))}
+        <rect
+          x={px(-10)}
+          y={pz(-42)}
+          width={20 * scale}
+          height={14 * scale}
+          rx="2"
+          fill="#ccab79"
+        />
         {places.map((p) => (
           <g key={p.id}>
             <circle
@@ -393,7 +421,7 @@ export default function App() {
             </nav>
           </header>
           <section key={state.place.id} {...stylex.props(s.location)} aria-label="Current location">
-            <span {...stylex.props(s.smallText)}>FROM FOOTHILLS TO FLOATING WORLDS</span>
+            <span {...stylex.props(s.smallText)}>A TOWN ABOVE THE CLOUDS</span>
             <h1 {...stylex.props(s.placeTitle)}>{state.place.english}</h1>
             <p lang="ja" {...stylex.props(s.japaneseName)}>
               {state.place.name}
@@ -621,8 +649,8 @@ export default function App() {
             <p {...stylex.props(s.story)}>
               No deadlines. No need to hurry.
               <br />
-              Start in the foothill town. Follow the red bridges north, through Cloudview Terrace,
-              to the floating village.
+              Follow the promenade north to the grand ryokan. Explore the lantern canal to the east,
+              or the cloudsea walk and shrine to the west. All seven places share one island.
             </p>
             {[
               { name: 'Walk', keys: 'W A S D / Arrow keys' },

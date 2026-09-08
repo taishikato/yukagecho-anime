@@ -4,7 +4,6 @@ export interface Island {
   z: number;
   y: number;
   radius: number;
-  grounded?: boolean;
 }
 export interface Place {
   id: string;
@@ -17,157 +16,177 @@ export interface Place {
   y: number;
   symbol: string;
 }
-export const islands: Island[] = [
-  { id: 'town', x: 0, z: 0, y: 0, radius: 18 },
-  { id: 'onsen', x: 35, z: 7, y: 1, radius: 11 },
-  { id: 'shrine', x: -33, z: -18, y: 2, radius: 10 },
-  { id: 'inn', x: 2, z: -42, y: 4, radius: 14 },
-  { id: 'ground', x: 0, z: 140, y: -28, radius: 32, grounded: true },
-  { id: 'ascent', x: 0, z: 70, y: -14, radius: 10 },
-];
-export const spawn = { x: 0, y: -27.85, z: 148 };
-export const registrationSign = { x: -2.5, y: -28, z: 148, radius: 2.8 };
-export type InteractionTarget = { kind: 'registration' } | { kind: 'discovery'; place: Place };
 
+// One continuous landmass. Districts are neighborhoods, not separate islands.
+export const islands: Island[] = [{ id: 'town', x: 0, z: 0, y: 0, radius: 58 }];
+export const spawn = { x: 0, y: 0.15, z: 43 };
+export const registrationSign = { x: -2.5, y: 0, z: 43, radius: 2.8 };
+export const terrace = { x: 0, z: -33, halfX: 14, halfZ: 14, y: 6 };
+export const canal = { x: 22, z: -12, width: 5.2, length: 44 };
+export interface Walkway {
+  id: string;
+  ax: number;
+  az: number;
+  bx: number;
+  bz: number;
+  ay: number;
+  by: number;
+  width: number;
+  arch: number;
+}
+export const walkways: Walkway[] = [
+  { id: 'ryokan-stairs', ax: 0, az: -5, bx: 0, bz: -19, ay: 0, by: 6, width: 6, arch: 0 },
+  ...[-27, -12, 4].map((z, index) => ({
+    id: `canal-bridge-${index}`,
+    ax: 17.5,
+    az: z,
+    bx: 26.5,
+    bz: z,
+    ay: 0,
+    by: 0,
+    width: 3,
+    arch: 1.2,
+  })),
+];
+export function walkwayPoint(w: Walkway, t: number) {
+  return {
+    x: w.ax + (w.bx - w.ax) * t,
+    z: w.az + (w.bz - w.az) * t,
+    y: w.ay + (w.by - w.ay) * t + Math.sin(Math.PI * t) * w.arch,
+  };
+}
+function walkwayHeight(w: Walkway, x: number, z: number) {
+  const dx = w.bx - w.ax,
+    dz = w.bz - w.az;
+  const length = Math.hypot(dx, dz);
+  const t = ((x - w.ax) * dx + (z - w.az) * dz) / (length * length);
+  const distance = Math.abs((x - w.ax) * dz - (z - w.az) * dx) / length;
+  return t >= 0 && t <= 1 && distance <= w.width / 2 - 0.25 ? walkwayPoint(w, t).y + 0.15 : null;
+}
+export const places: Place[] = [
+  {
+    id: 'ground',
+    name: '湯あかり表参道',
+    english: 'Yuakari Promenade',
+    symbol: '街',
+    x: 0,
+    z: 37,
+    y: 0,
+    description: 'A whole town above the clouds. Make yourself at home.',
+    story:
+      'Lanterns lead from the arrival square into the heart of Yukagecho. Timber inns crowd the slopes beneath Bounro Ryokan. Follow the broad avenue north, or wander east toward the springs and the lantern canal.',
+  },
+  {
+    id: 'ground-bath',
+    name: '桜泉の湯',
+    english: 'Sakura Springs',
+    symbol: '泉',
+    x: 28,
+    z: 30,
+    y: 0,
+    description: 'Warm water beneath a canopy of cherry blossoms.',
+    story:
+      'Small open-air baths line the garden path. Steam drifts between the cherry trees and the eaves of the teahouses. The path continues north to the larger baths overlooking the cloud sea.',
+  },
+  {
+    id: 'ascent',
+    name: '雲見の散歩道',
+    english: 'Cloudsea Walk',
+    symbol: '雲',
+    x: -39,
+    z: 26,
+    y: 0,
+    description: 'One side is a town. The other is an endless sky.',
+    story:
+      'Stone lanterns trace the western rim of the island. Look back to see the roofs of an entire town rising toward the great inn. Continue north to the quiet shrine, or return east to the lively promenade.',
+  },
+  {
+    id: 'town',
+    name: '灯籠運河',
+    english: 'Lantern Canal',
+    symbol: '灯',
+    x: 17,
+    z: 4,
+    y: 0,
+    description: 'Red bridges and a thousand windows above the water.',
+    story:
+      'Tall timber inns lean over the narrow canal. Lanterns hang between their balconies, and high bridges join the upper rooms. Walk along either bank and cross the three low red bridges to explore both sides.',
+  },
+  {
+    id: 'onsen',
+    name: '雲渡りの湯',
+    english: 'Kumowatari Onsen',
+    symbol: '湯',
+    x: 42,
+    z: 13,
+    y: 0,
+    description: 'Beyond the steam, the island gives way to clouds.',
+    story:
+      'The largest outdoor spring opens toward the eastern horizon. Blue water catches the last light of the day. A wooden pavilion shelters the bath, while the canal district glows just beyond the garden.',
+  },
+  {
+    id: 'shrine',
+    name: '風待ち神社',
+    english: 'Kazemachi Shrine',
+    symbol: '祈',
+    x: -35,
+    z: -18,
+    y: 0,
+    description: 'A quiet corner, where the wind carries your wishes.',
+    story:
+      'Beyond the busy inns, an old red gate stands among the pines. Travelers leave their wishes here before taking the long path around the island. From the shrine courtyard, the great ryokan rises above the tiled roofs.',
+  },
+  {
+    id: 'inn',
+    name: '望雲楼',
+    english: 'Bounro Ryokan',
+    symbol: '宿',
+    x: 0,
+    z: -23,
+    y: 6,
+    description: 'The heart of Yukagecho, rising above a sea of roofs.',
+    story:
+      'The grand inn crowns the northern terrace. Climb the broad red stairway to its courtyard and look south across the entire island: the promenade, the canal, the baths, and the cloud sea beyond. Its rooms are scenery for now; the courtyard is yours to explore.',
+  },
+];
+
+export type InteractionTarget = { kind: 'registration' } | { kind: 'discovery'; place: Place };
 export function interactionAt(x: number, z: number): InteractionTarget | null {
   if (Math.hypot(x - registrationSign.x, z - registrationSign.z) < registrationSign.radius)
     return { kind: 'registration' };
   const place = nearestPlace(x, z);
   return Math.hypot(x - place.x, z - place.z) < 4.3 ? { kind: 'discovery', place } : null;
 }
-export const connections = [
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [4, 5],
-  [5, 0],
-] as const;
-export const places: Place[] = [
-  {
-    id: 'ground',
-    name: '麓の温泉街',
-    english: 'Foothill Onsen Town',
-    description: 'Every skyward journey begins on a lantern-lit street.',
-    story:
-      'Steam rises between timber inns and cherry trees at the foot of the mountain. Beyond the rooftops, red bridges climb into the clouds. Follow the main street north to begin the ascent.',
-    x: 0,
-    z: 146,
-    y: -28,
-    symbol: '街',
-  },
-  {
-    id: 'ground-bath',
-    name: '桜泉の湯',
-    english: 'Sakura Springs',
-    description: 'Warm water, falling petals, and the sky overhead.',
-    story:
-      'The oldest spring in the valley gathers beneath the cherry blossoms. Look up from the water: the lights of Yukagecho are already glowing in the sky. The red stairway leaves from the north end of town.',
-    x: 12,
-    z: 136,
-    y: -28,
-    symbol: '泉',
-  },
-  {
-    id: 'ascent',
-    name: '雲見の辻',
-    english: 'Cloudview Terrace',
-    description: 'The town below. A whole new world above.',
-    story:
-      'Halfway between earth and sky, travelers pause at this little teahouse. Follow the red bridge north to reach Yuakari Street, or turn south to return to the foothill town.',
-    x: 0,
-    z: 70,
-    y: -14,
-    symbol: '雲',
-  },
-  {
-    id: 'town',
-    name: '湯あかり通り',
-    english: 'Yuakari Street',
-    description: 'Warm lanterns welcome the wandering traveler.',
-    story:
-      'As the clouds turn rose-gold, paper lanterns glow one by one. Wind chimes ring in the distance, mingling with the soft clack of wooden sandals. Here, there is no reason to hurry.',
-    x: 0,
-    z: 9,
-    y: 0,
-    symbol: '灯',
-  },
-  {
-    id: 'onsen',
-    name: '雲渡りの湯',
-    english: 'Kumowatari Onsen',
-    description: 'Beyond the steam, a new view awaits.',
-    story:
-      'For a thousand years, these blue springs have bubbled above the clouds. At the edge of the bath, the water seems to melt into the sky. Stay a moment. Take a breath.',
-    x: 32,
-    z: 12,
-    y: 1,
-    symbol: '湯',
-  },
-  {
-    id: 'shrine',
-    name: '風待ち神社',
-    english: 'Kazemachi Shrine',
-    description: 'Let the wind carry your wishes.',
-    story:
-      'A small shrine where skyward travelers once prayed for safe passage. Where do their wishes go when the wind carries them away? Perhaps only the cherry tree knows.',
-    x: -30,
-    z: -14,
-    y: 2,
-    symbol: '祈',
-  },
-  {
-    id: 'inn',
-    name: '望雲楼',
-    english: 'Bounro Ryokan',
-    description: 'An inn a little closer to the sky.',
-    story:
-      'Layer upon layer of tiled roofs rise like steps toward the sky. From the rooms of this traditional inn, a sea of clouds drifts far below. The rest of the journey can wait until tomorrow.',
-    x: 2,
-    z: -36,
-    y: 4,
-    symbol: '宿',
-  },
-];
 
-export function bridgeAt(a: Island, b: Island, t: number) {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    z: a.z + (b.z - a.z) * t,
-    y: a.y + (b.y - a.y) * t + Math.sin(Math.PI * t) * 1.6,
-  };
-}
-
-/** Continuous walkable surface, including height along arched bridges. */
+/** Rendering and traversal use the same bridge and terrace dimensions. */
 export function surfaceHeight(x: number, z: number): number | null {
-  for (const [ai, bi] of connections) {
-    const a = islands[ai],
-      b = islands[bi];
-    const dx = b.x - a.x,
-      dz = b.z - a.z,
-      len2 = dx * dx + dz * dz;
-    const t = ((x - a.x) * dx + (z - a.z) * dz) / len2;
-    const start = (a.radius - 2) / Math.sqrt(len2);
-    const end = 1 - (b.radius - 2) / Math.sqrt(len2);
-    if (t >= start && t <= end && Math.abs((x - a.x) * dz - (z - a.z) * dx) / Math.sqrt(len2) < 2) {
-      const u = (t - start) / (end - start);
-      return a.y + (b.y - a.y) * u + Math.sin(Math.PI * u) * 1.6 + 0.15;
-    }
+  if (Math.hypot(x, z) >= islands[0].radius * 0.965 - 0.65) return null;
+  for (const w of walkways) {
+    const y = walkwayHeight(w, x, z);
+    if (y !== null) return y;
   }
-  for (const island of islands) {
-    if (Math.hypot(x - island.x, z - island.z) < island.radius - 0.65) return island.y + 0.15;
-  }
-  return null;
+  if (
+    Math.abs(x - canal.x) < canal.width / 2 + 0.3 &&
+    Math.abs(z - canal.z) < canal.length / 2 + 0.3
+  )
+    return null;
+  if (Math.abs(x - terrace.x) <= terrace.halfX && Math.abs(z - terrace.z) <= terrace.halfZ)
+    return terrace.y + 0.15;
+  return 0.15;
 }
-
 export interface Obstacle {
   x: number;
   z: number;
   halfX: number;
   halfZ: number;
+  baseY?: number;
+  height?: number;
 }
-export function canWalk(x: number, z: number, obstacles: Obstacle[]) {
+export function canWalk(x: number, z: number, obstacles: Obstacle[], fromY?: number) {
+  const y = surfaceHeight(x, z);
   return (
-    surfaceHeight(x, z) !== null &&
+    y !== null &&
+    (fromY === undefined || Math.abs(y - fromY) <= 0.5) &&
     !obstacles.some((o) => Math.abs(x - o.x) < o.halfX + 0.32 && Math.abs(z - o.z) < o.halfZ + 0.32)
   );
 }

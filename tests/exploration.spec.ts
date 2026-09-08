@@ -102,13 +102,29 @@ test('mobile controls and dialog fit the viewport', async ({ page }) => {
   expect(dialogBox!.width).toBeLessThanOrEqual(390);
 });
 
-test('walks from the ground to the sky and completes the seven-place journal', async ({ page }) => {
-  // The full walking-speed round trip takes about 4.5 minutes on this machine.
+test('walks around the main island, crosses every canal bridge and completes the journal', async ({
+  page,
+}) => {
+  // Exercise actual keyboard movement through every district and back to arrival.
   test.setTimeout(420_000);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
   const world = page.locator('[data-world-x]');
-  async function walkTo(x: number, z: number) {
+  async function walkTo(x: number, z: number, segment = false) {
+    if (!segment) {
+      const start = await world.evaluate((el) => ({
+        x: Number(el.getAttribute('data-world-x')),
+        z: Number(el.getAttribute('data-world-z')),
+      }));
+      const steps = Math.ceil(Math.hypot(x - start.x, z - start.z) / 3);
+      for (let step = 1; step <= steps; step++)
+        await walkTo(
+          start.x + ((x - start.x) * step) / steps,
+          start.z + ((z - start.z) * step) / steps,
+          true,
+        );
+      return;
+    }
     await page.locator('canvas').focus();
     const deadline = Date.now() + 35_000;
     while (Date.now() < deadline) {
@@ -144,76 +160,91 @@ test('walks from the ground to the sky and completes the seven-place journal', a
     ).toBeVisible();
     await page.keyboard.press('Escape');
   }
-  await walkTo(0, 145);
-  await discover('Foothill Onsen Town');
-  await walkTo(0, 136);
-  await walkTo(12, 136);
-  await discover('Sakura Springs');
-  await walkTo(0, 136);
-  await walkTo(0, 110);
-  await walkTo(0, 90);
-  await page.screenshot({ path: '/tmp/yukagecho-ascent.png' });
-  await walkTo(0, 70);
-  await discover('Cloudview Terrace');
-  await expect
-    .poll(async () => Number(await world.getAttribute('data-world-y')))
-    .toBeGreaterThan(-15);
-  await walkTo(0, 45);
-  await walkTo(0, 20);
-  await walkTo(0, 12);
-  await expect
-    .poll(async () => Number(await world.getAttribute('data-world-y')))
-    .toBeGreaterThan(0);
-  await discover('Yuakari Street');
+  await walkTo(0, 37);
+  await discover('Yuakari Promenade');
   for (const [x, z] of [
-    [0, 1.8],
-    [14, 1.8],
-    [17, 3.4],
-    [27, 5.4],
-    [31.5, 11.8],
+    [0, 30],
+    [28, 30],
+  ])
+    await walkTo(x, z);
+  await discover('Sakura Springs');
+  await page.screenshot({ path: '/tmp/yukagecho-springs.png' });
+  for (const [x, z] of [
+    [17, 30],
+    [17, 16],
+    [17, 4],
+  ])
+    await walkTo(x, z);
+  await discover('Lantern Canal');
+  await page.screenshot({ path: '/tmp/yukagecho-canal.png' });
+  // All three low bridges must be traversable, not just visible scenery.
+  for (const [x, z] of [
+    [17, -27],
+    [27, -27],
+    [27, -12],
+    [17, -12],
+    [17, 4],
+    [27, 4],
+    [27, 16],
+    [42, 16],
+    [42, 13],
   ])
     await walkTo(x, z);
   await discover('Kumowatari Onsen');
   await page.screenshot({ path: '/tmp/yukagecho-onsen.png' });
   for (const [x, z] of [
-    [27, 5.4],
-    [16, 3.2],
-    [13, 1.8],
-    [0, 1.8],
-    [0, -15],
-    [1, -29],
-    [2, -36],
+    [42, 16],
+    [0, 16],
+    [-39, 16],
+    [-39, 26],
   ])
     await walkTo(x, z);
-  await discover('Bounro Ryokan');
+  await discover('Cloudsea Walk');
   for (const [x, z] of [
-    [1, -29],
-    [0, -15],
-    [0, 1.8],
-    [-13, 1.8],
-    [-14, -7.6],
-    [-25, -13.6],
-    [-30, -14],
+    [-39, 16],
+    [-47, 16],
+    [-47, -12],
+    [-35, -12],
+    [-35, -18],
   ])
     await walkTo(x, z);
   await discover('Kazemachi Shrine');
+  for (const [x, z] of [
+    [-35, -12],
+    [-17, -12],
+    [-17, 0],
+    [0, 0],
+    [0, -23],
+  ])
+    await walkTo(x, z);
+  await expect
+    .poll(async () => Number(await world.getAttribute('data-world-y')))
+    .toBeCloseTo(6.15, 1);
+  await discover('Bounro Ryokan');
+  await page.screenshot({ path: '/tmp/yukagecho-ryokan.png' });
   await page.keyboard.press('m');
   await expect(page.getByRole('dialog')).toContainText('Every place is now part of your journey.');
   await page.screenshot({ path: '/tmp/yukagecho-complete.png' });
   await page.keyboard.press('Escape');
   for (const [x, z] of [
-    [-25, -13.6],
-    [-14, -7.6],
-    [-13, 1.8],
-    [0, 1.8],
-    [0, 20],
-    [0, 45],
-    [0, 70],
-    [0, 90],
-    [0, 110],
-    [0, 146],
+    [0, 0],
+    [0, 37],
   ])
     await walkTo(x, z);
-  await expect.poll(async () => Number(await world.getAttribute('data-world-y'))).toBeLessThan(-27);
-  await discover('Foothill Onsen Town');
+  await expect
+    .poll(async () => Number(await world.getAttribute('data-world-y')))
+    .toBeCloseTo(0.15, 1);
+  await discover('Yuakari Promenade');
+});
+
+test('reports a failed ryokan asset and recovers after reloading', async ({ page }) => {
+  await page.route('**/models/bounro-ryokan.glb', (route) => route.abort());
+  await page.goto('/');
+  await expect(
+    page.getByText('The ryokan model could not load. Please reload the page.'),
+  ).toBeVisible();
+  await page.unroute('**/models/bounro-ryokan.glb');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: /Read the notice/ })).toBeVisible();
 });

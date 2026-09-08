@@ -1,27 +1,9 @@
-# Ground-to-sky experiment
-
-Branch: `experiment/ground-to-sky`, created from `main`.
-The existing English UI changes are included.
-
-[Open the experiment](https://yukagecho-ground-to-sky.taishi-k0903.workers.dev)
-
-Start in Foothill Onsen Town and walk north along the central street.
-Cross the red stair bridges through Cloudview Terrace to reach Yuakari Street and the original sky islands.
-All seven discoveries are reachable on foot, and the same route leads back to town.
-Sakura Springs is east of the main street.
-The UI is English, with Japanese place names beneath English headings.
-
-This branch deploys to the separate Cloudflare Worker `yukagecho-ground-to-sky`.
-The original `yukagecho-anime` Worker remains unchanged.
-The terrain, buildings, and traversal are procedural 3D, with the existing stylized art direction.
-The valley is bounded to the town and marked by low rails; distant woodland is scenery.
-
----
-
 # 湯影町
 
 雲海に浮かぶ温泉街を、浴衣の旅人で歩くブラウザ向け3D散策アプリです。
-朱塗りの橋でつながった4つの浮島に、湯あかり通り、雲渡りの湯、風待ち神社、望雲楼があります。
+直径約116ワールド単位の大きな主島に、湯あかり表参道、灯籠運河、雲渡りの湯、桜泉の湯、雲見の散歩道、風待ち神社、望雲楼を集めています。
+北側の高台には6層の大旅館があり、東側の運河には3本の歩ける朱橋と上層の渡り廊下があります。
+過去の地上から天空へ登る実験については [旧実験メモ](docs/ground-to-sky.md) を参照してください。
 
 [公開サイトを開く](https://anime.yukagecho.workers.dev)
 
@@ -64,9 +46,25 @@ npm run dev
 
 SSRが必要ない3Dアプリなので、Next.jsではなくViteを採用しました。
 建築と地形はコードで生成し、素材ごとにジオメトリを結合しています。
-Blenderや外部モデルのランタイムダウンロードは不要です。
+望雲楼はBlenderで制作した `public/models/bounro-ryokan.glb` を同一サイトから読み込みます。
+モデルは9メッシュ、約15万ポリゴン、約8.3 MBで、通常のgzip圧縮では約0.98 MBです。
+木材、石、地面にはワールド座標で連続する手続き型の質感を加えています。
 背景の雲海は生成画像をWebPに変換して同梱しています。
 日本語フォントにはGoogle Fontsを使用し、通信できない場合はローカルの明朝体・サンセリフ体にフォールバックします。
+
+## Blenderモデルの編集
+
+`assets/blender/bounro-ryokan.blend` をBlenderで開くと、各階、屋根、入口、素材ごとの構造を編集できます。
+このファイルは大旅館のモデルで、島全体の配置と他の街区は `src/world/architecture.ts` にあります。
+元のモデルを再生成する場合は、プロジェクトルートで次を実行します。
+このコマンドは `.blend` と `.glb` を上書きするため、手動編集したモデルは先に別名で保存してください。
+
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python scripts/build-ryokan.py
+```
+
+地形と橋の寸法、7つの発見地点は `src/world/map.ts` で一元管理しています。
+橋の描画と歩行面は同じ座標計算を使い、高台の垂直な崖は階段以外から昇降できません。
 
 ## 検証
 
@@ -79,7 +77,7 @@ npm run test:e2e
 ```
 
 E2Eテストはインストール済みのGoogle Chromeを使います。
-橋の地形の連続性、建物と島の端の衝突判定、全島への徒歩移動、記録の保存、ダイアログ中の一時停止、写真ダウンロード、環境音、夜景、モバイル表示を検証します。
+橋の地形の連続性、建物と島の端の衝突判定、全街区への徒歩移動と運河の3本の橋の横断、記録の保存、ダイアログ中の一時停止、写真ダウンロード、環境音、夜景、モバイル表示を検証します。
 スクリーンショットは `/tmp/yukagecho-*.png` に出力されます。
 
 ## Cloudflareへの公開
@@ -108,7 +106,9 @@ npm run deploy
 
 ## 実装の範囲
 
-地上の温泉街、中腹の展望所、4つの天空の島と遠景で構成される有限の世界です。
+散策可能な1つの主島と、景観用の3つの遠景島で構成される有限の世界です。
+参考画像の街区構成と雰囲気を反映したスタイライズド3Dで、写実的な再現ではありません。
+運河上層の渡り廊下と旅館の客室は景観用です。
 旅館内部、入浴モーション、マルチプレイヤーは実装していません。
 進行に制限時間やゲームオーバーはありません。
 WebGL対応ブラウザが必要で、3D描画が利用できない場合は再読み込みの案内を表示します。

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { weatherSurface } from './surfaces';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { islands, connections, registrationSign } from './map';
+import { islands, registrationSign, terrace, canal, walkways, walkwayPoint } from './map';
+import type { Walkway } from './map';
 import type { Obstacle } from './map';
 
 let seed = 721;
@@ -40,6 +42,11 @@ const materials = {
   green: new THREE.MeshStandardMaterial({ color: '#547b6b', roughness: 1 }),
   cloth: new THREE.MeshStandardMaterial({ color: '#395c70', roughness: 1, side: THREE.DoubleSide }),
 };
+for (const key of ['timber', 'trim', 'red'] as const) weatherSurface(materials[key], 'wood');
+for (const key of ['stone', 'darkStone', 'path', 'path2', 'plaster'] as const)
+  weatherSurface(materials[key], 'stone');
+weatherSurface(materials.roof, 'roof');
+weatherSurface(materials.moss, 'earth');
 type Mat = keyof typeof materials;
 
 /** Static geometry is batched by material: thousands of details, a few dozen draw calls. */
@@ -218,7 +225,7 @@ export function buildArchitecture(): WorldObjects {
     floors: number,
     main = false,
   ) {
-    obstacles.push({ x, z, halfX: w / 2, halfZ: d / 2 });
+    obstacles.push({ x, z, halfX: w / 2, halfZ: d / 2, baseY: ground, height: floors * 2.8 + 3 });
     b.box('darkStone', x, ground + 0.24, z, w + 0.7, 0.48, d + 0.7);
     for (let level = 0; level < floors; level++) {
       const y = ground + level * 2.8 + 0.48;
@@ -280,15 +287,15 @@ export function buildArchitecture(): WorldObjects {
       const xx = x + Math.cos(angle) * reach,
         zz = z + Math.sin(angle) * reach;
       b.beam('timber', vec(x + size * 0.15, y + size, z), vec(xx, height, zz), size * 0.055);
-      for (let k = 0; k < 3; k++)
+      for (let k = 0; k < 15; k++)
         b.ball(
           cherry ? (k % 2 ? 'pink' : 'blossom') : 'green',
-          xx + (random() - 0.5) * size,
-          height + random() * size * 0.25,
-          zz + (random() - 0.5) * size,
-          size * 0.75,
-          size * 0.35,
-          size * 0.65,
+          xx + (random() - 0.5) * size * 1.7,
+          height + (random() - 0.3) * size * 0.55,
+          zz + (random() - 0.5) * size * 1.6,
+          size * (0.2 + random() * 0.17),
+          size * (0.16 + random() * 0.12),
+          size * (0.2 + random() * 0.17),
         );
     }
   }
@@ -360,6 +367,24 @@ export function buildArchitecture(): WorldObjects {
         b.ball('green', x + Math.cos(a) * r, y + 0.2, z + Math.sin(a) * r, 0.35, 0.3, 0.4);
       }
     }
+    if (radius > 30) {
+      // Tall, irregular mineral columns break up the large island's cliff silhouette.
+      for (let i = 0; i < 110; i++) {
+        const a = (i / 110) * Math.PI * 2;
+        const reach = radius * (0.84 + random() * 0.11);
+        b.ball(
+          i % 3 ? 'darkStone' : 'stone',
+          x + Math.cos(a) * reach,
+          y - 16 - random() * 15,
+          z + Math.sin(a) * reach,
+          1.4 + random() * 2,
+          5 + random() * 10,
+          1.4 + random() * 2,
+        );
+        if (i % 3 === 0)
+          b.ball('moss', x + Math.cos(a) * reach, y - 1, z + Math.sin(a) * reach, 2.3, 0.7, 1.8);
+      }
+    }
     if (detail) {
       // Broad cross-shaped streets link all island exits, with individual irregular pavers.
       for (let xx = -radius + 1; xx < radius; xx += 1.25)
@@ -379,263 +404,348 @@ export function buildArchitecture(): WorldObjects {
         }
     }
   }
-  for (const i of islands) {
-    if (!i.grounded) island(i.x, i.y, i.z, i.radius);
-  }
-  // The valley is rooted in continuous land, with forested ridges behind the town.
-  b.box('moss', 0, -34, 150, 1600, 10, 1600);
-  b.add(new THREE.CylinderGeometry(32, 40, 9, 64), 'darkStone', 0, -32.5, 140);
-  b.add(new THREE.CylinderGeometry(32, 33, 0.4, 64), 'moss', 0, -28.2, 140);
-  for (let i = 0; i < 28; i++) {
-    const angle = (i / 28) * Math.PI * 2;
-    const xx = Math.cos(angle) * (65 + random() * 35);
-    const zz = 140 + Math.sin(angle) * 70;
-    if (zz < 100 && Math.abs(xx) < 45) continue;
-    b.ball('moss', xx, -34, zz, 20 + random() * 16, 15 + random() * 22, 24);
-    for (let j = 0; j < 3; j++) tree(xx + j * 4, -27, zz + j * 3, 2.5, false);
-  }
-  for (let i = 0; i < 80; i++) {
-    const x = (random() - 0.5) * 190;
-    const z = 45 + random() * 190;
-    if (Math.hypot(x, z - 140) < 39 || (Math.abs(x) < 9 && z < 110)) continue;
-    tree(x, -29, z, 1.5 + random() * 1.2, false);
-    b.ball('darkStone', x + 2, -29, z, 1.4, 0.8, 1.1);
-  }
-  // Low perimeter rails make the village boundary legible while leaving the ascent open.
-  for (let i = 0; i < 40; i++) {
-    const a = (i / 40) * Math.PI * 2;
-    const x = Math.cos(a) * 30.9,
-      z = 140 + Math.sin(a) * 30.9;
-    if (z < 112 && Math.abs(x) < 6) continue;
-    fence(x, -28, z, 4.9, -a - Math.PI / 2);
-  }
-  // Broad streets with an unobstructed northbound route into the sky.
-  for (let x = -29; x <= 29; x += 1.25)
-    for (let z = 110; z <= 169; z += 1.25) {
-      if (
-        Math.hypot(x, z - 140) < 31 &&
-        (Math.abs(x) < 3.8 || Math.abs(z - 136) < 3.8 || Math.abs(z - 153) < 3)
-      ) {
-        b.box(random() > 0.5 ? 'path' : 'path2', x, -27.94, z, 1.18, 0.15, 1.18);
-      }
-    }
-  for (const z of [119, 128, 145, 160]) {
-    house(-9, -28, z, 6.4, 5.1, z === 128 ? 3 : 2);
-    if (z !== 128) house(9, -28, z, 6.4, 5.1, 2);
-  }
-  house(-20, -28, 137, 7, 6, 3, true);
-  house(20, -28, 151, 7, 5, 3);
-  house(16, -28, 122, 7, 5, 2);
-  house(-17, -28, 153, 5, 4, 2);
-  for (const z of [113, 123, 133, 143, 153, 165])
-    for (const x of [-4.2, 4.2]) lantern(x, -28, z, true);
-  for (const [x, z] of [
-    [-25, 144],
-    [-20, 121],
-    [24, 137],
-    [20, 160],
-    [-9, 166],
-    [25, 148],
-  ])
-    tree(x, -28, z, 2.6);
-  for (const z of [136, 154]) {
-    for (const x of [-5, 5]) b.box('timber', x, -25, z, 0.13, 6, 0.13);
-    b.beam('timber', vec(-5, -22.5, z), vec(5, -22.5, z), 0.035);
-    for (let x = -4; x <= 4; x += 1.3) lantern(x, -23.1, z);
-  }
-  // Midway tea terrace marks the transition from grounded town to sky.
-  house(-5, -14, 70, 3.7, 4, 1);
-  tree(5.5, -14, 73, 1.9);
-  fence(-5.5, -14, 76, 4, 0, true);
-  fence(5.5, -14, 76, 4, 0, true);
-  // Leave the central bridge approach open.
-  fence(-7, -28, 113, 6, 0, true);
-  fence(7, -28, 113, 6, 0, true);
-  // A dense, layered village with a clear walkable central street.
-  house(-7.6, 0, 6, 5.3, 4.6, 2);
-  house(7.6, 0, 5.5, 5.4, 4.6, 2);
-  house(-8.3, 0, -2.1, 5.8, 4.8, 3);
-  house(8.3, 0, -2.7, 5.6, 4.7, 2);
-  house(-7.2, 0, -10, 5.2, 4.5, 2);
-  house(7.1, 0, -10, 5.1, 4.2, 3);
-  house(2, 4, -46, 10, 7, 4, true);
-  house(-6, 4, -40, 4.2, 4, 2);
-  house(10, 4, -40, 4, 4.5, 2);
-  house(36, 1, 1.7, 6.6, 4.2, 2);
-  house(-34, 2, -21, 5.5, 4.5, 1);
-  // Outdoor onsen: rocky ring, animated water and wooden pavilion.
-  const poolX = 37,
-    poolZ = 10,
-    poolY = 1.2;
-  obstacles.push({ x: poolX, z: poolZ, halfX: 3.35, halfZ: 2.9 });
-  b.add(new THREE.CylinderGeometry(4.7, 4.7, 0.45, 40), 'darkStone', poolX, poolY, poolZ);
-  for (let i = 0; i < 27; i++) {
-    const t = (i / 27) * Math.PI * 2;
-    b.ball(
-      i % 2 ? 'stone' : 'darkStone',
-      poolX + Math.cos(t) * 4.4,
-      poolY + 0.4,
-      poolZ + Math.sin(t) * 4.4,
-      0.7,
-      0.45 + random() * 0.3,
-      0.6,
-    );
-  }
-  const water = new THREE.Mesh(
-    new THREE.CircleGeometry(4.25, 64),
-    new THREE.ShaderMaterial({
-      uniforms: { time: { value: 0 } },
-      transparent: true,
-      vertexShader:
-        'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader: `uniform float time; varying vec2 vUv;
-      void main(){vec2 p=vUv-.5;float d=length(p);float wave=sin(d*90.-time*1.4+sin(p.x*22.+time)*1.5)*.5+.5;
-      float caustic=pow(max(0.,sin(p.x*37.+sin(p.y*21.+time))*sin(p.y*34.-time*.6)),6.);
-      vec3 col=mix(vec3(.055,.37,.41),vec3(.22,.79,.77),wave*.25+(1.-d*1.8)*.45);
-      col+=vec3(.32,.6,.55)*caustic*.32;gl_FragColor=vec4(col,.95);}`,
-    }),
+  island(0, 0, 0, islands[0].radius, false);
+  // Retaining walls and a six-meter terrace give the main inn a clear silhouette.
+  b.box(
+    'darkStone',
+    terrace.x,
+    terrace.y / 2 - 0.1,
+    terrace.z,
+    terrace.halfX * 2,
+    terrace.y,
+    terrace.halfZ * 2,
   );
-  water.rotation.x = -Math.PI / 2;
-  water.position.set(poolX, poolY + 0.27, poolZ);
-  waters.push(water);
-  b.group.add(water);
-  const valleyWater = new THREE.Mesh(
-    water.geometry.clone(),
-    (water.material as THREE.ShaderMaterial).clone(),
-  );
-  valleyWater.rotation.x = -Math.PI / 2;
-  valleyWater.position.set(18, -27.55, 136);
-  waters.push(valleyWater);
-  b.group.add(valleyWater);
-  obstacles.push({ x: 18, z: 136, halfX: 4.1, halfZ: 4.1 });
-  b.add(new THREE.CylinderGeometry(4.8, 4.8, 0.5, 40), 'darkStone', 18, -27.9, 136);
-  for (let i = 0; i < 28; i++) {
-    const a = (i / 28) * Math.PI * 2;
-    b.ball('stone', 18 + Math.cos(a) * 4.5, -27.5, 136 + Math.sin(a) * 4.5, 0.65, 0.55, 0.65);
-  }
-  steamSources.push(vec(16, -27.5, 136), vec(20, -27.5, 137), vec(18, -27.5, 134));
-
-  steamSources.push(
-    vec(poolX - 2, 1.6, poolZ),
-    vec(poolX + 2, 1.6, poolZ),
-    vec(poolX, 1.6, poolZ + 2),
-  );
-  for (const dx of [-1.7, 1.7])
-    for (const dz of [-1.4, 1.4]) b.box('timber', 41 + dx, 2.6, 7 + dz, 0.16, 3, 0.16);
-  roof(41, 4.15, 7, 4.6, 4.3);
-  // Shrine torii.
-  for (const dx of [-2.1, 2.1]) {
-    b.add(pole, 'red', -32 + dx, 4.3, -15.8, 0.21, 4.6, 0.21);
-    b.add(pole, 'black', -32 + dx, 2.35, -15.8, 0.25, 0.6, 0.25);
-  }
-  b.box('red', -32, 5.55, -15.8, 5.3, 0.22, 0.24);
-  b.box('red', -32, 6.35, -15.8, 6.1, 0.35, 0.45);
-  b.box('black', -32, 6.6, -15.8, 6.5, 0.2, 0.55);
-  b.box('gold', -32, 5.95, -15.55, 0.46, 0.62, 0.09);
-  // Arched bridges, each plank and rail follows the same surface as the player.
-  for (const [ai, bi] of connections) {
-    const a = islands[ai],
-      c = islands[bi];
-    const dx = c.x - a.x,
-      dz = c.z - a.z,
-      len = Math.hypot(dx, dz);
-    const start = (a.radius - 2) / len,
-      end = 1 - (c.radius - 2) / len;
-    const angle = Math.atan2(dx, dz),
-      perpendicular = vec(Math.cos(angle), 0, -Math.sin(angle));
-    const point = (t: number, side = 0, h = 0) =>
-      vec(
-        a.x + dx * (start + (end - start) * t) + perpendicular.x * side,
-        a.y + (c.y - a.y) * t + Math.sin(Math.PI * t) * 1.6 + h,
-        a.z + dz * (start + (end - start) * t) + perpendicular.z * side,
+  b.box('path', 0, terrace.y - 0.04, terrace.z, 28, 0.18, 28);
+  for (let x = -13; x <= 13; x += 1.3)
+    for (let y = 0.45; y < 6; y += 0.65)
+      b.box(
+        y % 1.3 < 0.7 ? 'stone' : 'darkStone',
+        x + (y % 1.3 < 0.7 ? 0 : 0.3),
+        y,
+        -18.98,
+        1.23,
+        0.59,
+        0.18,
       );
-    const count = Math.ceil((len * (end - start)) / 0.33);
+
+  function paving(x: number, z: number, w: number, d: number, y = 0) {
+    for (let xx = x - w / 2; xx < x + w / 2; xx += 1.2)
+      for (let zz = z - d / 2; zz < z + d / 2; zz += 1.2) {
+        if (Math.hypot(xx, zz) > 55 || (y === 0 && Math.abs(xx) < 14.2 && zz < -18.8 && zz > -47.2))
+          continue;
+        if (
+          Math.abs(xx - canal.x) < canal.width / 2 + 0.45 &&
+          Math.abs(zz - canal.z) < canal.length / 2 + 0.4
+        )
+          continue;
+        b.box(
+          random() > 0.5 ? 'path' : 'path2',
+          xx,
+          y + 0.055,
+          zz,
+          1.13,
+          0.14,
+          1.13,
+          (random() - 0.5) * 0.035,
+        );
+      }
+  }
+  paving(0, 22, 8, 62);
+  paving(0, 16, 88, 7);
+  paving(0, -12, 88, 6);
+  paving(-22, -1, 5, 78);
+  paving(39, 6, 5, 62);
+  paving(16.8, -12, 4.2, 48);
+  paving(27.3, -12, 4.2, 48);
+  paving(22, -36, 16, 4);
+  paving(23, 30, 35, 5);
+  paving(-22, 27, 43, 5);
+  paving(0, -23, 26, 7, 6);
+  // A continuous promenade follows the cliff rim, with a railing on the outside.
+  for (let i = 0; i < 180; i++) {
+    const a = (i / 180) * Math.PI * 2;
+    const x = Math.cos(a) * 51.6,
+      z = Math.sin(a) * 51.6;
+    b.box('path2', x, 0.025, z, 2.0, 0.14, 3.8, -a - Math.PI / 2);
+    if (i % 2 === 0) fence(Math.cos(a) * 53.8, 0, Math.sin(a) * 53.8, 3.8, -a - Math.PI / 2);
+    if (i % 9 === 0) lantern(x, 0, z, true);
+  }
+  // The public avenue leaves a wide view of the crown of the island.
+  for (const [x, z, floors, w, d] of [
+    [-9, 36, 3, 6.8, 6],
+    [9, 36, 2, 6.4, 6],
+    [-9, 25, 3, 6.8, 6],
+    [9, 25, 3, 6.4, 6],
+    [-9, 6, 4, 7, 7],
+    [9, 6, 3, 6.5, 6],
+    [-9, -4, 4, 7, 6],
+    [9, -4, 4, 6.5, 6],
+    [-32, 36, 2, 6, 5],
+    [-21, 36, 3, 7, 6],
+    [-20, 44, 2, 6, 5],
+    [-31, 20, 3, 7, 5],
+    [-20, 20, 3, 7, 5],
+    [-32, 6, 3, 7, 6],
+    [-22, 6, 2, 6, 6],
+    [-43, 6, 2, 6, 6],
+    [-32, -3, 3, 7, 5],
+    [-22, -3, 4, 6, 5],
+    [-43, -3, 2, 5, 5],
+    [-22, -22, 4, 6, 6],
+    [-22, -33, 3, 6, 6],
+    [-34, -34, 3, 6, 6],
+    [-24, -43, 2, 6, 5],
+    [20, 40, 2, 6, 5],
+    [37, 24, 2, 6, 5],
+    [44, -7, 3, 6, 6],
+    [43, -20, 3, 6, 6],
+    [37, -33, 3, 6, 5],
+  ])
+    house(x, 0, z, w, d, floors);
+
+  // Narrow, tall canal district. Both banks and every cross street remain open.
+  for (const [index, z] of [-30, -21, -3, 7].entries()) {
+    house(11, 0, z, 5.4, 5.5, 4 + (index % 2));
+    house(33, 0, z, 5.4, 5.5, 5 + (index % 2));
+  }
+  // The landmark is supplied by the editable Blender asset.
+  obstacles.push({ x: 0, z: -35, halfX: 10, halfZ: 7, baseY: 6, height: 26 });
+  house(-9.5, 6, -43, 5, 4, 2);
+  house(9.5, 6, -43, 5, 4, 2);
+  fence(-8.5, 6, -19.1, 10, 0, true);
+  fence(8.5, 6, -19.1, 10, 0, true);
+  for (const x of [-13.7, 13.7]) fence(x, 6, -33, 27, Math.PI / 2);
+  fence(0, 6, -46.7, 27);
+
+  function bridge(w: Walkway, overhead = false) {
+    const angle = Math.atan2(w.bx - w.ax, w.bz - w.az);
+    const normal = vec(Math.cos(angle), 0, -Math.sin(angle));
+    const point = (t: number, side = 0, height = 0) => {
+      const p = walkwayPoint(w, t);
+      return vec(p.x + normal.x * side, p.y + height, p.z + normal.z * side);
+    };
+    const count = Math.ceil(Math.hypot(w.bx - w.ax, w.bz - w.az) / 0.25);
     for (let i = 0; i <= count; i++) {
       const p = point(i / count);
-      b.box('trim', p.x, p.y, p.z, 4.2, 0.2, 0.3, angle);
+      b.box('trim', p.x, p.y, p.z, w.width, 0.2, 0.27, angle);
     }
-    for (const side of [-2.05, 2.05]) {
-      for (let i = 0; i < 24; i++)
-        for (const h of [-0.4, 0.55, 1.15])
-          b.beam('red', point(i / 24, side, h), point((i + 1) / 24, side, h), h < 0 ? 0.18 : 0.08);
-      for (let i = 0; i <= 12; i++) {
-        const p = point(i / 12, side, 0.65);
-        b.box('red', p.x, p.y, p.z, 0.17, 1.5, 0.17);
-        b.ball('black', p.x, p.y + 0.8, p.z, 0.16, 0.16, 0.16);
+    for (const side of [-w.width / 2, w.width / 2]) {
+      for (let i = 0; i < count; i++)
+        for (const h of [-0.45, 0.55, 1.1])
+          b.beam(
+            'red',
+            point(i / count, side, h),
+            point((i + 1) / count, side, h),
+            h < 0 ? 0.22 : 0.075,
+          );
+      for (let i = 0; i <= count; i += 4) {
+        const p = point(i / count, side, 0.55);
+        b.box('red', p.x, p.y, p.z, 0.16, 1.35, 0.16);
+        b.ball('black', p.x, p.y + 0.74, p.z, 0.13, 0.13, 0.13);
       }
     }
-    for (const t of [0, 1])
-      for (const side of [-2.5, 2.5]) {
-        const p = point(t, side);
+    if (!overhead)
+      for (const t of [0, 1]) {
+        const p = point(t, w.width / 2 + 0.45);
         lantern(p.x, p.y, p.z, true);
       }
   }
-  for (const [x, z, y, size] of [
-    [-13, 8, 0, 2.2],
-    [13, 9, 0, 2.1],
-    [-13, -7, 0, 2.6],
-    [12, -9, 0, 2],
-    [-38, -16, 2, 2.5],
-    [-28, -23, 2, 1.8],
-    [42, 12, 1, 2.2],
-    [30, 2, 1, 1.5],
-    [-7, -49, 4, 2.4],
-    [11, -46, 4, 2.1],
+  walkways.forEach((w) => bridge(w));
+  // Upper bridges are architectural connections, with no accessible upper interiors.
+  for (const [z, y] of [
+    [-21, 9],
+    [-3, 12],
   ])
-    tree(x, y, z, size);
-  for (const [x, z, y] of [
-    [-14, 1, 0],
-    [15, 1, 0],
-    [-4, 13, 0],
-    [8, 13, 0],
-    [-39, -22, 2],
-    [29, 12, 1],
-    [-3, -31, 4],
-  ])
-    tree(x, y, z, 1.6, false);
-  for (const z of [12, 5, -3, -11]) for (const x of [-3.3, 3.3]) lantern(x, 0, z, true);
-  lantern(31, 1, 14, true);
-  lantern(-28, 2, -12, true);
-  lantern(2, 4, -33, true);
-  // Lantern garlands across the street.
-  for (const z of [4, -5]) {
-    for (const x of [-5, 5]) b.box('timber', x, 3, z, 0.12, 6, 0.12);
-    for (let i = 0; i < 20; i++) {
-      const x = -5 + i * 0.5,
-        h = 5.8 - (1 - (x / 5) ** 2) * 0.9;
-      const next = x + 0.5,
-        nh = 5.8 - (1 - (next / 5) ** 2) * 0.9;
-      b.beam('timber', vec(x, h, z), vec(next, nh, z), 0.014);
-      if (i % 3 === 1) lantern(x, h - 0.4, z);
+    bridge(
+      { id: 'upper', ax: 13.5, az: z, bx: 30.5, bz: z, ay: y, by: y, width: 2.2, arch: 1.3 },
+      true,
+    );
+
+  function waterSurface(
+    x: number,
+    y: number,
+    z: number,
+    geometry: THREE.BufferGeometry,
+    isCanal = false,
+  ) {
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.ShaderMaterial({
+        uniforms: { time: { value: 0 }, canal: { value: isCanal ? 1 : 0 } },
+        transparent: true,
+        vertexShader:
+          'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+        fragmentShader: `uniform float time; uniform float canal; varying vec2 vUv;
+        void main(){vec2 p=vUv-.5; float wave=sin(p.y*130.-time*1.7+sin(p.x*30.+time)*1.2)*.5+.5;
+        float caustic=pow(max(0.,sin(p.x*37.+sin(p.y*21.+time))*sin(p.y*34.-time*.6)),6.);
+        vec3 col=mix(vec3(.045,.30,.34),vec3(.18,.67,.65),wave*.18+.35);
+        col=mix(col,vec3(.008,.035,.065)+vec3(.012,.03,.045)*wave,canal);
+        float reflection=pow(max(0.,sin(p.y*82.)),20.)*pow(abs(p.x)*2.,5.);
+        col+=vec3(.9,.44,.12)*reflection*canal+vec3(.23,.46,.4)*caustic*.3;
+        gl_FragColor=vec4(col,.98);}`,
+      }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y, z);
+    waters.push(mesh);
+    b.group.add(mesh);
+  }
+  waterSurface(canal.x, 0.21, canal.z, new THREE.PlaneGeometry(canal.width, canal.length), true);
+  for (const x of [canal.x - canal.width / 2 - 0.12, canal.x + canal.width / 2 + 0.12]) {
+    b.box('darkStone', x, 0.12, canal.z, 0.3, 0.45, canal.length + 0.6);
+    for (let z = -33; z <= 9; z += 1.5) {
+      if (walkways.some((w) => w.arch > 0 && Math.abs(w.az - z) < 2.1)) continue;
+      b.box('timber', x, 0.6, z, 0.12, 1.2, 0.12);
+      b.box('timber', x, 0.9, z, 0.09, 0.1, 1.55);
     }
   }
-  // Balustrades frame viewpoints, leaving bridge entrances open.
-  fence(-7, 0, 13, 6);
-  fence(7, 0, 13, 6);
-  fence(36, 1, 15.3, 9);
-  fence(-33, 2, -10, 7);
-  // Remote islands create depth and the feeling of a larger archipelago.
+  for (const z of [-31, -18, -6, 8]) {
+    for (let i = 0; i < 24; i++) {
+      const x = 14 + i * 0.67;
+      const h = (v: number) => 7.5 - Math.sin(((v - 14) / 16) * Math.PI) * 1.8;
+      b.beam('black', vec(x, h(x), z), vec(x + 0.67, h(x + 0.67), z), 0.022);
+      if (i % 4 === 1) lantern(x, h(x) - 0.5, z);
+    }
+  }
+  function pool(x: number, z: number, r: number) {
+    obstacles.push({ x, z, halfX: r + 0.15, halfZ: r + 0.15 });
+    b.add(new THREE.CylinderGeometry(r + 0.5, r + 0.6, 0.5, 40), 'darkStone', x, 0.1, z);
+    waterSurface(x, 0.39, z, new THREE.CircleGeometry(r, 48));
+    const count = Math.ceil(r * 7);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      b.ball(
+        i % 3 ? 'darkStone' : 'stone',
+        x + Math.cos(a) * (r + 0.1),
+        0.5,
+        z + Math.sin(a) * (r + 0.1),
+        0.6,
+        0.4 + random() * 0.2,
+        0.55,
+      );
+    }
+    for (const dx of [-r / 2, r / 2]) steamSources.push(vec(x + dx, 0.6, z));
+  }
+  pool(46, 5, 4.6);
+  pool(34, 33, 3.5);
+  pool(23, 25, 2.3);
+  pool(29, 22, 1.8);
+  for (const x of [44, 48]) for (const z of [10, 13]) b.box('timber', x, 1.7, z, 0.18, 3.4, 0.18);
+  roof(46, 3.5, 11.5, 6, 5);
+
+  // Shrine precinct and the cloud-facing tea terrace.
+  house(-35, 0, -25, 7, 5, 2, true);
+  for (const dx of [-2.1, 2.1]) {
+    b.add(pole, 'red', -35 + dx, 2.3, -18.5, 0.21, 4.6, 0.21);
+    b.add(pole, 'black', -35 + dx, 0.3, -18.5, 0.25, 0.6, 0.25);
+  }
+  b.box('red', -35, 3.6, -18.5, 5.3, 0.22, 0.24);
+  b.box('red', -35, 4.4, -18.5, 6.1, 0.35, 0.45);
+  b.box('black', -35, 4.65, -18.5, 6.5, 0.2, 0.55);
+  paving(-35, -19, 11, 13);
+  for (const x of [-42, -36]) for (const z of [29, 33]) b.box('timber', x, 1.6, z, 0.18, 3.2, 0.18);
+  roof(-39, 3.3, 31, 8, 6);
+  b.box('timber', -39, 0.6, 32, 4, 0.16, 0.8);
+  fence(-41, 0, 28, 8, Math.PI / 2, true);
+
+  for (const [x, z, size] of [
+    [-13, 43, 2.6],
+    [12, 43, 2.3],
+    [-17, 29, 2.1],
+    [16, 30, 2.4],
+    [-16, 11, 2.2],
+    [-37, 12, 2.6],
+    [-45, 20, 2.6],
+    [-45, -14, 2.7],
+    [-42, -25, 2.4],
+    [-29, -20, 2],
+    [-15, -35, 2],
+    [28, 37, 2.8],
+    [39, 33, 2.5],
+    [26, 18, 2.1],
+    [43, 18, 2.2],
+    [48, -1, 2],
+    [41, -29, 2],
+    [19, -39, 2.3],
+  ])
+    tree(x, 0, z, size);
+  tree(-11, 6, -24, 2.2);
+  tree(11, 6, -24, 2.2);
+  for (const z of [46, 35, 23, 12, 1, -6]) for (const x of [-4.4, 4.4]) lantern(x, 0, z, true);
+  for (const x of [-45, -35, -24, -13, 15, 28, 40]) lantern(x, 0, 13, true);
+  for (const z of [-30, -19, -3, 8]) for (const x of [17, 27]) lantern(x, 0, z, true);
+  for (const z of [30, 18]) {
+    b.beam('black', vec(-5, 5, z), vec(5, 5, z), 0.025);
+    for (const x of [-5, 5]) b.box('timber', x, 2.5, z, 0.16, 5, 0.16);
+    for (let x = -4; x <= 4; x += 1.3) lantern(x, 4.6, z);
+  }
+  for (const [x, z] of [
+    [-5, 25],
+    [5, 35],
+    [-27, 17],
+    [37, 21],
+    [14, -2],
+  ]) {
+    b.box('trim', x, 0.85, z, 1.5, 0.12, 0.65);
+    for (const dx of [-0.6, 0.6]) b.box('timber', x + dx, 0.42, z, 0.1, 0.84, 0.5);
+    for (let i = 0; i < 4; i++) b.ball('gold', x - 0.5 + i * 0.32, 1.01, z, 0.12, 0.12, 0.12);
+  }
+  for (const [x, z, rotation] of [
+    [-2.8, 24, 0.4],
+    [3, 17, -1],
+    [-25, 14, 2],
+    [28, -18, 1.3],
+    [16.8, -17, -0.5],
+    [37, 16, 2.3],
+    [-37, 27, 1.5],
+    [6, -23, 3],
+  ]) {
+    const guest = createTraveler();
+    guest.group.position.set(x, z < -20 && x > -14 && x < 14 ? 6.15 : 0.15, z);
+    guest.group.rotation.y = rotation;
+    guest.group.updateMatrixWorld(true);
+    const guestMaterials = new Set<THREE.Material>();
+    guest.group.traverse((object) => {
+      if (
+        !(object instanceof THREE.Mesh) ||
+        !(object.material instanceof THREE.MeshStandardMaterial)
+      )
+        return;
+      const color = object.material.color.getHexString();
+      const mat: Mat =
+        color === '426b82'
+          ? 'cloth'
+          : color === '202d38'
+            ? 'black'
+            : color === 'e3b792'
+              ? 'trim'
+              : 'gold';
+      const geometry = object.geometry.clone().applyMatrix4(object.matrixWorld);
+      b.add(geometry, mat, 0, 0, 0);
+      geometry.dispose();
+      object.geometry.dispose();
+      guestMaterials.add(object.material);
+    });
+    guestMaterials.forEach((material) => material.dispose());
+  }
+  // A few far silhouettes frame the main island instead of competing with it.
   for (const [x, z, y, r] of [
-    [-76, -64, 0, 9],
-    [65, -75, 12, 12],
-    [-35, -105, 19, 13],
-    [40, -132, 12, 10],
-    [98, -35, -4, 12],
-    [-90, 15, -8, 10],
+    [-105, -95, -8, 10],
+    [103, -110, -3, 12],
+    [18, -158, 9, 11],
   ]) {
     island(x, y, z, r, false);
-    house(x, y, z, r * 0.68, r * 0.5, 3, true);
+    house(x, y, z, r * 0.65, r * 0.5, 3, true);
     tree(x + r * 0.65, y, z, 2, false);
   }
   for (const [text, x, y, z] of [
-    ['湯あかり', 3.5, 0, 9],
-    ['雲渡りの湯', 30, 1, 12],
-    ['風待ち神社', -28, 2, -14],
-    ['望雲楼', 5, 4, -36],
-    ['天空への道', 3.7, -28, 115],
-    ['麓の温泉街', 3.7, -28, 146],
-    ['桜泉の湯', 12, -28, 138],
-    ['雲見の辻', 3, -14, 70],
+    ['湯あかり表参道', 4, 0, 37],
+    ['灯籠運河', 16, 0, 10],
+    ['雲渡りの湯', 41, 0, 13],
+    ['風待ち神社', -31, 0, -17],
+    ['望雲楼', 4, 6, -24],
+    ['桜泉の湯', 28, 0, 29],
+    ['雲見の散歩道', -38, 0, 26],
   ] as const) {
     const canvas = document.createElement('canvas');
     canvas.width = 128;
