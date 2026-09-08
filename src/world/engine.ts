@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { districtCameraDistance, followOffset } from './camera';
+import { followOffset } from './camera';
 import { weatherSurface } from './surfaces';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
@@ -35,15 +35,6 @@ export class WorldEngine {
   private composer: EffectComposer;
   private objects = buildArchitecture();
   private traveler = createTraveler();
-  private cameraWalls = this.objects.obstacles
-    .filter((o) => o.height !== undefined)
-    .map(
-      (o) =>
-        new THREE.Box3(
-          new THREE.Vector3(o.x - o.halfX - 1.2, o.baseY ?? 0, o.z - o.halfZ - 1.2),
-          new THREE.Vector3(o.x + o.halfX + 1.2, (o.baseY ?? 0) + o.height!, o.z + o.halfZ + 1.2),
-        ),
-    );
   private keys = new Set<string>();
   private yaw = 0.1;
   private pitch = 0.24;
@@ -421,25 +412,10 @@ export class WorldEngine {
     this.traveler.right.rotation.x = -walk;
     this.traveler.la.rotation.x = -walk * 0.7;
     this.traveler.ra.rotation.x = walk * 0.7;
-    // Anchor the frame to the body, including during jumps. Forward look-ahead can
-    // put a collision-shortened camera in front of the player in a narrow street.
+    // Follow the traveler with the distance and angles chosen by the user.
     this.focus.copy(this.traveler.group.position).add(new THREE.Vector3(0, 1.1, 0));
-    const smoothing = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 4);
-    const distance = districtCameraDistance(this.distance, this.position.x, this.position.z);
-    const offset = followOffset(this.focus, distance, this.yaw, this.pitch, this.cameraWalls);
-    this.camera.position.lerp(this.focus.clone().add(offset), smoothing);
-    // Interpolation around corners can cross a wall or cut inside the safe radius.
-    // Resolve the interpolated orbit as well, so every rendered frame stays safe.
-    const easedOffset = this.camera.position.clone().sub(this.focus);
-    const easedDistance = easedOffset.length();
-    const safeOffset = followOffset(
-      this.focus,
-      easedDistance,
-      Math.atan2(easedOffset.x, easedOffset.z),
-      Math.asin(THREE.MathUtils.clamp(easedOffset.y / Math.max(easedDistance, 0.001), -1, 1)),
-      this.cameraWalls,
-    );
-    this.camera.position.copy(this.focus).add(safeOffset);
+    const offset = followOffset(this.distance, this.yaw, this.pitch);
+    this.camera.position.copy(this.focus).add(offset);
     this.camera.lookAt(this.focus);
     const t = this.reducedMotion ? 0 : this.time;
     for (const s of this.steam) {
