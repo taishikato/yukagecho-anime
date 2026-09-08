@@ -139,7 +139,7 @@ for (const mobile of [false, true]) {
     await expect(dialog).not.toBeVisible();
     await expect(page.locator('canvas')).toBeFocused();
     await expect(page.locator('[data-world-paused]')).toHaveAttribute('data-world-paused', 'false');
-    await expect(page.getByText('0 / 7', { exact: true })).toBeVisible();
+    await expect(page.getByText('0 / 9', { exact: true })).toBeVisible();
   });
 }
 
@@ -157,7 +157,7 @@ test('nearby sign uses the same target for E and tap without recording a discove
   await page.keyboard.press('e');
   await expect(page.getByRole('dialog')).toContainText('Resident Registration');
   await page.keyboard.press('Escape');
-  await expect(page.getByText('0 / 7', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 / 9', { exact: true })).toBeVisible();
   await notice.click();
   await expect(page.getByRole('dialog')).toContainText('Resident Registration');
   await page.getByRole('button', { name: 'Keep exploring', exact: true }).click();

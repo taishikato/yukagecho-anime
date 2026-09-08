@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 import { weatherSurface } from './surfaces';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { islands, registrationSign, terrace, canal, walkways, walkwayPoint } from './map';
+import {
+  islands,
+  registrationSign,
+  terrace,
+  canal,
+  walkways,
+  walkwayPoint,
+  surfaceHeight,
+} from './map';
 import type { Walkway } from './map';
 import type { Obstacle } from './map';
 
@@ -404,7 +412,12 @@ export function buildArchitecture(): WorldObjects {
         }
     }
   }
-  island(0, 0, 0, islands[0].radius, false);
+  for (const platform of islands)
+    island(platform.x, platform.y, platform.z, platform.radius, false);
+  // A shared bedrock connects the upper town, lower shelf and switchback buttresses.
+  b.ball('darkStone', 0, -58, 45, 68, 35, 98);
+  for (const side of [-1, 1])
+    b.add(new THREE.CylinderGeometry(7, 12, 48, 14), 'darkStone', side * 64, -36, 74);
   // Retaining walls and a six-meter terrace give the main inn a clear silhouette.
   b.box(
     'darkStone',
@@ -431,7 +444,10 @@ export function buildArchitecture(): WorldObjects {
   function paving(x: number, z: number, w: number, d: number, y = 0) {
     for (let xx = x - w / 2; xx < x + w / 2; xx += 1.2)
       for (let zz = z - d / 2; zz < z + d / 2; zz += 1.2) {
-        if (Math.hypot(xx, zz) > 55 || (y === 0 && Math.abs(xx) < 14.2 && zz < -18.8 && zz > -47.2))
+        if (
+          surfaceHeight(xx, zz, y + 0.15) === null ||
+          Math.abs(surfaceHeight(xx, zz, y + 0.15)! - y - 0.15) > 0.2
+        )
           continue;
         if (
           Math.abs(xx - canal.x) < canal.width / 2 + 0.45 &&
@@ -464,10 +480,11 @@ export function buildArchitecture(): WorldObjects {
   // A continuous promenade follows the cliff rim, with a railing on the outside.
   for (let i = 0; i < 180; i++) {
     const a = (i / 180) * Math.PI * 2;
-    const x = Math.cos(a) * 51.6,
-      z = Math.sin(a) * 51.6;
+    const x = Math.cos(a) * 71.8,
+      z = Math.sin(a) * 71.8;
     b.box('path2', x, 0.025, z, 2.0, 0.14, 3.8, -a - Math.PI / 2);
-    if (i % 2 === 0) fence(Math.cos(a) * 53.8, 0, Math.sin(a) * 53.8, 3.8, -a - Math.PI / 2);
+    if (i % 2 === 0 && !(Math.abs(Math.abs(x) - 52) < 6 && z > 44 && z < 59))
+      fence(Math.cos(a) * 73.8, 0, Math.sin(a) * 73.8, 3.8, -a - Math.PI / 2);
     if (i % 9 === 0) lantern(x, 0, z, true);
   }
   // The public avenue leaves a wide view of the crown of the island.
@@ -525,10 +542,36 @@ export function buildArchitecture(): WorldObjects {
       return vec(p.x + normal.x * side, p.y + height, p.z + normal.z * side);
     };
     const count = Math.ceil(Math.hypot(w.bx - w.ax, w.bz - w.az) / 0.25);
-    for (let i = 0; i <= count; i++) {
-      const p = point(i / count);
-      b.box('trim', p.x, p.y, p.z, w.width, 0.2, 0.27, angle);
-    }
+    if (w.kind === 'slope') {
+      const positions: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const a = point(i / count, -w.width / 2),
+          c = point(i / count, w.width / 2);
+        const d = point((i + 1) / count, -w.width / 2),
+          e = point((i + 1) / count, w.width / 2);
+        for (const p of [a, d, c, c, d, e]) positions.push(p.x, p.y, p.z);
+        if (i % 5 === 0)
+          b.beam(
+            'darkStone',
+            a.clone().add(vec(0, 0.012, 0)),
+            c.clone().add(vec(0, 0.012, 0)),
+            0.018,
+          );
+      }
+      const deck = new THREE.BufferGeometry();
+      deck.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      deck.computeVertexNormals();
+      b.add(deck, 'path', 0, 0, 0);
+      deck.dispose();
+      for (const t of [0.2, 0.5, 0.8]) {
+        const p = point(t);
+        b.beam('darkStone', p.clone().add(vec(0, -1, 0)), vec(p.x, -38, p.z), 1.1);
+      }
+    } else
+      for (let i = 0; i <= count; i++) {
+        const p = point(i / count);
+        b.box('trim', p.x, p.y, p.z, w.width, 0.2, 0.27, angle);
+      }
     for (const side of [-w.width / 2, w.width / 2]) {
       for (let i = 0; i < count; i++)
         for (const h of [-0.45, 0.55, 1.1])
@@ -632,6 +675,115 @@ export function buildArchitecture(): WorldObjects {
   pool(29, 22, 1.8);
   for (const x of [44, 48]) for (const z of [10, 13]) b.box('timber', x, 1.7, z, 0.18, 3.4, 0.18);
   roof(46, 3.5, 11.5, 6, 5);
+
+  // The enlarged upper town has a new southern avenue and a northern inn district.
+  paving(0, 52, 111, 7);
+  paving(0, 61, 6, 21);
+  paving(0, -54, 94, 6);
+  paving(-50, -14, 6, 82);
+  paving(50, -14, 6, 82);
+  paving(-53, 39, 6, 28);
+  paving(53, 39, 6, 28);
+  paving(-46, 27, 26, 5);
+  paving(45, 30, 23, 5);
+  paving(0, -64, 6, 17);
+  for (const side of [-1, 1]) {
+    for (const [x, z, floors] of [
+      [12, 61, 3],
+      [23, 60, 3],
+      [35, 59, 2],
+      [45, 43, 3],
+      [61, 15, 3],
+      [60, -3, 4],
+      [58, -23, 3],
+      [43, -45, 3],
+      [31, -50, 4],
+      [17, -56, 3],
+      [10, -64, 2],
+    ]) {
+      house(side * x, 0, z, 6.3, 5.4, floors);
+    }
+    for (const x of [12, 26, 40, 51]) lantern(side * x, 0, 49, true);
+    tree(side * 28, 0, 49, 2.5);
+    tree(side * 46, 0, 52, 2.1);
+    tree(side * 55, 0, -37, 2.6);
+    tree(side * 30, 0, -61, 2.3);
+  }
+
+  // Midway balconies are part of the same rock mass, with a clear turning area.
+  for (const side of [-1, 1]) {
+    paving(side * 64, 74, 12, 17, -9);
+    house(side * 69, -9, 74, 3.7, 4.2, 2);
+    tree(side * 61, -9, 74, 1.5);
+    for (const z of [69, 77]) lantern(side * 61, -9, z, true);
+    fence(side * 72, -9, 74, 9, Math.PI / 2, true);
+  }
+
+  // The lower quarter nestles against the southern cliff, eighteen meters down.
+  // The northern edge is the retaining wall; all public streets lie south of it.
+  b.box('darkStone', 0, -10, 79.7, 76, 16, 1.8);
+  for (let x = -36; x <= 36; x += 2.1)
+    for (let y = -17; y < -3; y += 1.3)
+      b.box('stone', x + (Math.floor(y) % 2) * 0.35, y, 80.68, 1.95, 1.17, 0.18);
+  paving(0, 104, 78, 7, -18);
+  paving(0, 111, 7, 53, -18);
+  paving(0, 86, 67, 5, -18);
+  paving(0, 121, 66, 5, -18);
+  paving(-24, 111, 5, 49, -18);
+  paving(24, 111, 5, 49, -18);
+  paving(-36, 100, 8, 10, -18);
+  paving(36, 100, 8, 10, -18);
+  for (const side of [-1, 1]) {
+    for (const [x, z, w, floors] of [
+      [10, 93, 6.4, 4],
+      [18, 93, 5.6, 3],
+      [32, 93, 6.2, 4],
+      [10, 113, 6.4, 3],
+      [18, 113, 5.6, 4],
+      [32, 113, 6.2, 3],
+      [9, 131, 6, 3],
+      [18, 129, 5.4, 2],
+    ]) {
+      house(side * x, -18, z, w, 6, floors);
+    }
+    for (const x of [7, 16, 26, 35]) lantern(side * x, -18, 100, true);
+    for (const z of [88, 108, 122, 135]) lantern(side * 4.2, -18, z, true);
+    tree(side * 28, -18, 124, 2.1);
+    tree(side * 35, -18, 86, 1.6);
+    // Market counters, stools and hanging noren face the main cross street.
+    for (const x of [8, 16, 30]) {
+      const xx = side * x;
+      b.box('trim', xx, -17.05, 98.5, 3, 0.15, 0.9);
+      for (const dx of [-1.2, 1.2]) b.box('timber', xx + dx, -17.5, 98.5, 0.12, 1, 0.75);
+      for (const dx of [-0.9, 0, 0.9]) {
+        b.box('cloth', xx + dx, -15.5, 98.5, 0.82, 0.7, 0.04);
+        b.ball('gold', xx + dx, -16.82, 98.5, 0.15, 0.15, 0.15);
+      }
+      for (const dx of [-1.4, 1.4]) b.box('timber', xx + dx, -16.7, 98.5, 0.13, 2.6, 0.13);
+      roof(xx, -15.3, 98.5, 3.7, 2.2);
+      obstacles.push({ x: xx, z: 98.5, halfX: 1.5, halfZ: 0.45, baseY: -18, height: 2.8 });
+    }
+  }
+  for (const z of [101, 117, 127]) {
+    for (const x of [-5, 5]) b.box('timber', x, -15.3, z, 0.15, 5.4, 0.15);
+    for (let i = 0; i < 20; i++) {
+      const x = -5 + i * 0.5;
+      const h = (xx: number) => -12.8 - Math.sin(((xx + 5) / 10) * Math.PI);
+      b.beam('black', vec(x, h(x), z), vec(x + 0.5, h(x + 0.5), z), 0.02);
+      if (i % 3 === 1) lantern(x, h(x) - 0.4, z);
+    }
+  }
+  // A lower promenade follows the exposed crescent, with openings at the two ramps.
+  for (let i = 0; i < 96; i++) {
+    const a = (i / 96) * Math.PI * 2;
+    const x = Math.cos(a) * 39,
+      z = 100 + Math.sin(a) * 39;
+    if (z < 82) continue;
+    b.box('path2', x, -17.975, z, 2.8, 0.14, 3.2, -a - Math.PI / 2);
+    if (Math.abs(z - 99) > 4)
+      fence(Math.cos(a) * 40.3, -18, 100 + Math.sin(a) * 40.3, 3, -a - Math.PI / 2, true);
+    if (i % 7 === 0) lantern(x, -18, z, true);
+  }
 
   // Shrine precinct and the cloud-facing tea terrace.
   house(-35, 0, -25, 7, 5, 2, true);
@@ -746,6 +898,12 @@ export function buildArchitecture(): WorldObjects {
     ['望雲楼', 4, 6, -24],
     ['桜泉の湯', 28, 0, 29],
     ['雲見の散歩道', -38, 0, 26],
+    ['宵待ち横丁へ', -48, 0, 52],
+    ['宵待ち横丁へ', 48, 0, 52],
+    ['九折坂', -66, -9, 70],
+    ['宵待ち横丁', 4, -18, 104],
+    ['上の町へ', -35, -18, 102],
+    ['上の町へ', 35, -18, 102],
   ] as const) {
     const canvas = document.createElement('canvas');
     canvas.width = 128;

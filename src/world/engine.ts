@@ -180,7 +180,7 @@ export class WorldEngine {
       const sprite = new THREE.Sprite(material);
       const a = random() * Math.PI * 2,
         r = 62 + random() * 125;
-      sprite.position.set(Math.cos(a) * r, -16 - random() * 16, Math.sin(a) * r - 25);
+      sprite.position.set(Math.cos(a) * r, -42 - random() * 16, Math.sin(a) * r + 20);
       const s = 20 + random() * 36;
       sprite.scale.set(s * 2, s, 1);
       this.scene.add(sprite);
@@ -338,7 +338,7 @@ export class WorldEngine {
     this.yaw -= (e.clientX - this.pointer.x) * 0.004;
     this.pitch = THREE.MathUtils.clamp(
       this.pitch + (e.clientY - this.pointer.y) * 0.003,
-      0.22,
+      0.04,
       1.15,
     );
     this.pointer = { x: e.clientX, y: e.clientY, id: e.pointerId };
@@ -349,7 +349,7 @@ export class WorldEngine {
   private wheel = (e: WheelEvent) => {
     e.preventDefault();
     if (this.isPaused) return;
-    this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.018, 10, 100);
+    this.distance = THREE.MathUtils.clamp(this.distance + e.deltaY * 0.018, 10, 150);
   };
 
   private animate = (now: number) => {
@@ -397,7 +397,8 @@ export class WorldEngine {
         )
       )
         this.position.z += dz * speed;
-      this.position.y = surfaceHeight(this.position.x, this.position.z) ?? this.position.y;
+      this.position.y =
+        surfaceHeight(this.position.x, this.position.z, this.position.y) ?? this.position.y;
       if (this.jumpSpeed !== 0 || this.jump > 0) {
         this.jumpSpeed -= 12 * dt;
         this.jump = Math.max(0, this.jump + this.jumpSpeed * dt);
@@ -476,7 +477,7 @@ export class WorldEngine {
     }
   };
   private publishState() {
-    const place = nearestPlace(this.position.x, this.position.z);
+    const place = nearestPlace(this.position.x, this.position.z, this.position.y);
     this.callbacks.onState({
       x: this.position.x,
       z: this.position.z,
@@ -484,8 +485,13 @@ export class WorldEngine {
       yaw: this.yaw,
       paused: this.isPaused,
       place,
-      interaction: interactionAt(this.position.x, this.position.z),
-      nearby: Math.hypot(this.position.x - place.x, this.position.z - place.z) < 4.3,
+      interaction: interactionAt(this.position.x, this.position.z, this.position.y),
+      nearby:
+        Math.hypot(
+          this.position.x - place.x,
+          this.position.z - place.z,
+          this.position.y - place.y,
+        ) < 4.3,
     });
   }
   pause(value: boolean) {

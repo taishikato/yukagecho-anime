@@ -4,6 +4,7 @@ export interface Island {
   z: number;
   y: number;
   radius: number;
+  minZ?: number;
 }
 export interface Place {
   id: string;
@@ -18,7 +19,13 @@ export interface Place {
 }
 
 // One continuous landmass. Districts are neighborhoods, not separate islands.
-export const islands: Island[] = [{ id: 'town', x: 0, z: 0, y: 0, radius: 58 }];
+export const islands: Island[] = [
+  { id: 'town', x: 0, z: 0, y: 0, radius: 78 },
+  { id: 'lower-town', x: 0, z: 100, y: -18, radius: 43, minZ: 81 },
+  { id: 'west-landing', x: -64, z: 74, y: -9, radius: 10 },
+  { id: 'east-landing', x: 64, z: 74, y: -9, radius: 10 },
+];
+export const lowerTown = islands[1];
 export const spawn = { x: 0, y: 0.15, z: 43 };
 export const registrationSign = { x: -2.5, y: 0, z: 43, radius: 2.8 };
 export const terrace = { x: 0, z: -33, halfX: 14, halfZ: 14, y: 6 };
@@ -33,8 +40,35 @@ export interface Walkway {
   by: number;
   width: number;
   arch: number;
+  kind?: 'slope';
 }
 export const walkways: Walkway[] = [
+  ...[-1, 1].flatMap((side): Walkway[] => [
+    {
+      id: `${side < 0 ? 'west' : 'east'}-upper-slope`,
+      ax: side * 52,
+      az: 52,
+      bx: side * 64,
+      bz: 66,
+      ay: 0,
+      by: -9,
+      width: 6,
+      arch: 0,
+      kind: 'slope',
+    },
+    {
+      id: `${side < 0 ? 'west' : 'east'}-lower-slope`,
+      ax: side * 62,
+      az: 81,
+      bx: side * 37,
+      bz: 99,
+      ay: -9,
+      by: -18,
+      width: 6,
+      arch: 0,
+      kind: 'slope',
+    },
+  ]),
   { id: 'ryokan-stairs', ax: 0, az: -5, bx: 0, bz: -19, ay: 0, by: 6, width: 6, arch: 0 },
   ...[-27, -12, 4].map((z, index) => ({
     id: `canal-bridge-${index}`,
@@ -74,7 +108,7 @@ export const places: Place[] = [
     y: 0,
     description: 'A whole town above the clouds. Make yourself at home.',
     story:
-      'Lanterns lead from the arrival square into the heart of Yukagecho. Timber inns crowd the slopes beneath Bounro Ryokan. Follow the broad avenue north, or wander east toward the springs and the lantern canal.',
+      'Lanterns lead from the arrival square into the heart of Yukagecho. Timber inns crowd the slopes beneath Bounro Ryokan. Follow the broad avenue north, or head south to the signed east and west slopes. They descend through a midway terrace into the lantern-lit lower town.',
   },
   {
     id: 'ground-bath',
@@ -148,19 +182,51 @@ export const places: Place[] = [
     story:
       'The grand inn crowns the northern terrace. Climb the broad red stairway to its courtyard and look south across the entire island: the promenade, the canal, the baths, and the cloud sea beyond. Its rooms are scenery for now; the courtyard is yours to explore.',
   },
+  {
+    id: 'switchback',
+    name: '九折坂の踊り場',
+    english: 'Switchback Terrace',
+    symbol: '坂',
+    x: -64,
+    z: 74,
+    y: -9,
+    description: 'The rooftops above. The night market below.',
+    story:
+      'Halfway down the western cliff road, the town opens in two directions. The great inn rises above the upper streets, while lanterns lead downhill into the lower quarter. Follow the stone slope south, then east, to the market.',
+  },
+  {
+    id: 'lower-market',
+    name: '宵待ち横丁',
+    english: 'Yoimachi Night Market',
+    symbol: '宵',
+    x: 0,
+    z: 104,
+    y: -18,
+    description: 'A second town, tucked beneath the first.',
+    story:
+      'Eighteen meters below the promenade, kitchens, tea shops and narrow inns crowd the lantern-lit street. Look up between the roofs to see the island rising above you. The east and west slopes both climb back to the upper town, making a full walking loop.',
+  },
 ];
 
 export type InteractionTarget = { kind: 'registration' } | { kind: 'discovery'; place: Place };
-export function interactionAt(x: number, z: number): InteractionTarget | null {
-  if (Math.hypot(x - registrationSign.x, z - registrationSign.z) < registrationSign.radius)
+export function interactionAt(x: number, z: number, y?: number): InteractionTarget | null {
+  if (
+    Math.hypot(
+      x - registrationSign.x,
+      z - registrationSign.z,
+      y === undefined ? 0 : y - registrationSign.y,
+    ) < registrationSign.radius
+  )
     return { kind: 'registration' };
-  const place = nearestPlace(x, z);
-  return Math.hypot(x - place.x, z - place.z) < 4.3 ? { kind: 'discovery', place } : null;
+  const place = nearestPlace(x, z, y);
+  return Math.hypot(x - place.x, z - place.z, y === undefined ? 0 : y - place.y) < 4.3
+    ? { kind: 'discovery', place }
+    : null;
 }
 
 /** Rendering and traversal use the same bridge and terrace dimensions. */
-export function surfaceHeight(x: number, z: number): number | null {
-  if (Math.hypot(x, z) >= islands[0].radius * 0.965 - 0.65) return null;
+export function surfaceHeight(x: number, z: number, fromY?: number): number | null {
+  // Bridges and slopes own their corridor, including the joins to each terrace.
   for (const w of walkways) {
     const y = walkwayHeight(w, x, z);
     if (y !== null) return y;
@@ -172,7 +238,17 @@ export function surfaceHeight(x: number, z: number): number | null {
     return null;
   if (Math.abs(x - terrace.x) <= terrace.halfX && Math.abs(z - terrace.z) <= terrace.halfZ)
     return terrace.y + 0.15;
-  return 0.15;
+  const heights = islands
+    .filter(
+      (i) =>
+        (i.minZ === undefined || z >= i.minZ) &&
+        Math.hypot(x - i.x, z - i.z) < i.radius * 0.965 - 0.65,
+    )
+    .map((i) => i.y + 0.15);
+  if (!heights.length) return null;
+  return fromY === undefined
+    ? Math.max(...heights)
+    : heights.sort((a, b) => Math.abs(a - fromY) - Math.abs(b - fromY))[0];
 }
 export interface Obstacle {
   x: number;
@@ -183,13 +259,20 @@ export interface Obstacle {
   height?: number;
 }
 export function canWalk(x: number, z: number, obstacles: Obstacle[], fromY?: number) {
-  const y = surfaceHeight(x, z);
+  const y = surfaceHeight(x, z, fromY);
   return (
     y !== null &&
     (fromY === undefined || Math.abs(y - fromY) <= 0.5) &&
-    !obstacles.some((o) => Math.abs(x - o.x) < o.halfX + 0.32 && Math.abs(z - o.z) < o.halfZ + 0.32)
+    !obstacles.some(
+      (o) =>
+        y + 1.8 > (o.baseY ?? 0) &&
+        y < (o.baseY ?? 0) + (o.height ?? 3) &&
+        Math.abs(x - o.x) < o.halfX + 0.32 &&
+        Math.abs(z - o.z) < o.halfZ + 0.32,
+    )
   );
 }
-export function nearestPlace(x: number, z: number) {
-  return [...places].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
+export function nearestPlace(x: number, z: number, y?: number) {
+  const distance = (p: Place) => Math.hypot(p.x - x, p.z - z, y === undefined ? 0 : p.y - y);
+  return [...places].sort((a, b) => distance(a) - distance(b))[0];
 }

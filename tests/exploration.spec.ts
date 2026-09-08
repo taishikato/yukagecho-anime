@@ -16,10 +16,10 @@ test('exploration, journal persistence, camera, audio, night and photo', async (
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toContainText('Added to your travel journal');
   await page.keyboard.press('Escape');
-  await expect(page.getByText('1 / 7', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 / 9', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
-  await expect(page.getByText('1 / 7', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 / 9', { exact: true })).toBeVisible();
   // Wait for the camera's documented entry transition before the visual snapshot.
   await page.waitForTimeout(1800);
   await page.screenshot({ path: '/tmp/yukagecho-desktop.png' });
@@ -106,7 +106,7 @@ test('walks around the main island, crosses every canal bridge and completes the
   page,
 }) => {
   // Exercise actual keyboard movement through every district and back to arrival.
-  test.setTimeout(420_000);
+  test.setTimeout(540_000);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
   const world = page.locator('[data-world-x]');
@@ -222,12 +222,44 @@ test('walks around the main island, crosses every canal bridge and completes the
     .toBeCloseTo(6.15, 1);
   await discover('Bounro Ryokan');
   await page.screenshot({ path: '/tmp/yukagecho-ryokan.png' });
+  // Descend west, cross the lower market, and climb back via the east route.
+  for (const [x, z] of [
+    [0, 0],
+    [0, 52],
+    [-52, 52],
+    [-64, 66],
+    [-64, 74],
+  ])
+    await walkTo(x, z);
+  await expect
+    .poll(async () => Number(await world.getAttribute('data-world-y')))
+    .toBeCloseTo(-8.85, 1);
+  await discover('Switchback Terrace');
+  await page.screenshot({ path: '/tmp/yukagecho-switchback.png' });
+  for (const [x, z] of [
+    [-62, 81],
+    [-37, 99],
+    [-35, 104],
+    [0, 104],
+  ])
+    await walkTo(x, z);
+  await expect
+    .poll(async () => Number(await world.getAttribute('data-world-y')))
+    .toBeCloseTo(-17.85, 1);
+  await discover('Yoimachi Night Market');
+  await page.screenshot({ path: '/tmp/yukagecho-lower-market.png' });
   await page.keyboard.press('m');
   await expect(page.getByRole('dialog')).toContainText('Every place is now part of your journey.');
   await page.screenshot({ path: '/tmp/yukagecho-complete.png' });
   await page.keyboard.press('Escape');
   for (const [x, z] of [
-    [0, 0],
+    [35, 104],
+    [37, 99],
+    [62, 81],
+    [64, 74],
+    [64, 66],
+    [52, 52],
+    [0, 52],
     [0, 37],
   ])
     await walkTo(x, z);

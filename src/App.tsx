@@ -19,7 +19,16 @@ import {
 } from 'lucide-react';
 import { s } from './styles';
 import { Registration } from './features/residency/Registration';
-import { islands, walkways, canal, terrace, places, spawn, interactionAt } from './world/map';
+import {
+  islands,
+  walkways,
+  canal,
+  terrace,
+  lowerTown,
+  places,
+  spawn,
+  interactionAt,
+} from './world/map';
 import type { Place } from './world/map';
 import type { WorldEngine, WorldState } from './world/engine';
 import { Soundscape } from './world/audio';
@@ -53,9 +62,10 @@ function OnsenMark() {
   );
 }
 function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
-  const scale = 1.42;
+  const centerZ = 35;
+  const scale = 80 / Math.max(...islands.map((i) => Math.hypot(i.x, i.z - centerZ) + i.radius));
   const px = (x: number) => 100 + x * scale,
-    pz = (z: number) => 100 + z * scale;
+    pz = (z: number) => 100 + (z - centerZ) * scale;
   return (
     <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden="true">
       <defs>
@@ -93,12 +103,12 @@ function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
               cy={pz(i.z)}
               rx={i.radius * scale}
               ry={i.radius * scale}
-              fill="#52635c"
+              fill={i.y < 0 ? (i.y < -9 ? '#756454' : '#6c7160') : '#52635c'}
               stroke="#8e9273"
               strokeWidth=".5"
             />
             <path
-              d={`M${px(i.x) - i.radius},${pz(i.z)}h${i.radius * 2}M${px(i.x)},${pz(i.z) - i.radius}v${i.radius * 2}`}
+              d={`M${px(i.x) - i.radius * scale},${pz(i.z)}h${i.radius * 2 * scale}M${px(i.x)},${pz(i.z) - i.radius * scale}v${i.radius * 2 * scale}`}
               stroke="#b3a78a"
               strokeWidth="1.4"
             />
@@ -156,6 +166,29 @@ function MiniMap({ state, visited }: { state: WorldState; visited: string[] }) {
           rx="2"
           fill="#ccab79"
         />
+        <path
+          d={`M${px(-37)},${pz(104)}H${px(37)}M${px(0)},${pz(84)}V${pz(136)}M${px(-52)},${pz(52)}H${px(52)}`}
+          stroke="#d7bc8c"
+          strokeWidth="2"
+          fill="none"
+        />
+        {[-1, 1].map((side) => (
+          <g key={side}>
+            {[93, 113, 131].map((z) => (
+              <rect
+                key={z}
+                x={px(side * 10) - 3}
+                y={pz(z) - 3}
+                width="6"
+                height="6"
+                fill="#d5a573"
+              />
+            ))}
+          </g>
+        ))}
+        <text x={px(lowerTown.x)} y={pz(141)} textAnchor="middle" fontSize="6" fill="#e8cfa5">
+          LOWER TOWN
+        </text>
         {places.map((p) => (
           <g key={p.id}>
             <circle
@@ -650,7 +683,8 @@ export default function App() {
               No deadlines. No need to hurry.
               <br />
               Follow the promenade north to the grand ryokan. Explore the lantern canal to the east,
-              or the cloudsea walk and shrine to the west. All seven places share one island.
+              or take either signed slope south to the lower night market. East and west routes form
+              a walking loop across three levels.
             </p>
             {[
               { name: 'Walk', keys: 'W A S D / Arrow keys' },

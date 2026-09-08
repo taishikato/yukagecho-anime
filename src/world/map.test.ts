@@ -55,20 +55,38 @@ describe('walkable main island', () => {
     expect(canWalk(14.1, -30, [], 6.15)).toBe(false);
     expect(canWalk(0, -10.1, [], surfaceHeight(0, -10)!)).toBe(true);
   });
+  it('connects upper town, midway balconies and lower market without teleporting', () => {
+    expect(surfaceHeight(0, 52)).toBeCloseTo(0.15);
+    expect(surfaceHeight(-64, 74)).toBeCloseTo(-8.85);
+    expect(surfaceHeight(0, 104)).toBeCloseTo(-17.85);
+    expect(canWalk(0, 81, [], 0.15)).toBe(false);
+    expect(surfaceHeight(0, 80, -17.85)).toBeNull();
+    for (const side of [-1, 1]) {
+      expect(surfaceHeight(side * 62, 81)).toBeCloseTo(-8.85);
+      expect(surfaceHeight(side * 37, 99)).toBeCloseTo(-17.85);
+    }
+  });
+  it('resolves building collisions and interactions at the traveler height', () => {
+    const upperBuilding = { x: 0, z: 104, halfX: 2, halfZ: 2, baseY: 0, height: 10 };
+    expect(canWalk(0, 104, [upperBuilding], -17.85)).toBe(true);
+    expect(canWalk(0, 104, [{ ...upperBuilding, baseY: -18 }], -17.85)).toBe(false);
+    expect(interactionAt(0, 104, 0)).toBeNull();
+    expect(interactionAt(0, 104, -17.85)?.kind).toBe('discovery');
+  });
   it('prevents walking into buildings or off the floating island', () => {
     const obstacles = [{ x: 7, z: 5, halfX: 2, halfZ: 2 }];
     expect(canWalk(7, 5, obstacles)).toBe(false);
     expect(canWalk(4.8, 5, obstacles)).toBe(false);
     expect(canWalk(0, 5, obstacles)).toBe(true);
     expect(canWalk(80, 80, obstacles)).toBe(false);
-    expect(surfaceHeight(57, 0)).toBeNull();
-    expect(surfaceHeight(40, 40)).toBeNull();
+    expect(surfaceHeight(77, 0)).toBeNull();
+    expect(surfaceHeight(60, -60)).toBeNull();
   });
 });
 
 describe('registration interaction', () => {
-  it('prioritizes the arrival sign and preserves all seven discovery identities', () => {
-    expect(places.map((p) => p.id)).toEqual([
+  it('prioritizes the arrival sign and preserves the original discovery identities', () => {
+    expect(places.slice(0, 7).map((p) => p.id)).toEqual([
       'ground',
       'ground-bath',
       'ascent',
