@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { districtCameraDistance, followOffset } from './camera';
 import { weatherSurface } from './surfaces';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
@@ -39,12 +40,10 @@ export class WorldEngine {
     .map(
       (o) =>
         new THREE.Box3(
-          new THREE.Vector3(o.x - o.halfX - 0.7, o.baseY ?? 0, o.z - o.halfZ - 0.7),
-          new THREE.Vector3(o.x + o.halfX + 0.7, (o.baseY ?? 0) + o.height!, o.z + o.halfZ + 0.7),
+          new THREE.Vector3(o.x - o.halfX - 1.2, o.baseY ?? 0, o.z - o.halfZ - 1.2),
+          new THREE.Vector3(o.x + o.halfX + 1.2, (o.baseY ?? 0) + o.height!, o.z + o.halfZ + 1.2),
         ),
     );
-  private cameraRay = new THREE.Ray();
-  private cameraHit = new THREE.Vector3();
   private keys = new Set<string>();
   private yaw = 0.1;
   private pitch = 0.24;
@@ -421,32 +420,25 @@ export class WorldEngine {
     this.traveler.right.rotation.x = -walk;
     this.traveler.la.rotation.x = -walk * 0.7;
     this.traveler.ra.rotation.x = walk * 0.7;
-    const inCanal =
-      this.position.x > 14 && this.position.x < 30 && this.position.z > -35 && this.position.z < 12;
-    const target = this.position
-      .clone()
-      .add(new THREE.Vector3(0, inCanal ? 2 : 1.5, inCanal ? -1 : -4));
+    // Anchor the frame to the body, including during jumps. Forward look-ahead can
+    // put a collision-shortened camera in front of the player in a narrow street.
+    this.focus.copy(this.traveler.group.position).add(new THREE.Vector3(0, 1.1, 0));
     const smoothing = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 4);
-    this.focus.lerp(target, smoothing);
-    const distance = inCanal ? Math.max(4, this.distance - 20) : this.distance;
-    const pitch = this.pitch;
-    const offset = new THREE.Vector3(
-      Math.sin(this.yaw) * Math.cos(pitch) * distance,
-      Math.sin(pitch) * distance,
-      Math.cos(this.yaw) * Math.cos(pitch) * distance,
+    const distance = districtCameraDistance(this.distance, this.position.x, this.position.z);
+    const offset = followOffset(this.focus, distance, this.yaw, this.pitch, this.cameraWalls);
+    this.camera.position.lerp(this.focus.clone().add(offset), smoothing);
+    // Interpolation around corners can cross a wall or cut inside the safe radius.
+    // Resolve the interpolated orbit as well, so every rendered frame stays safe.
+    const easedOffset = this.camera.position.clone().sub(this.focus);
+    const easedDistance = easedOffset.length();
+    const safeOffset = followOffset(
+      this.focus,
+      easedDistance,
+      Math.atan2(easedOffset.x, easedOffset.z),
+      Math.asin(THREE.MathUtils.clamp(easedOffset.y / Math.max(easedDistance, 0.001), -1, 1)),
+      this.cameraWalls,
     );
-    this.cameraRay.set(this.focus, offset.clone().normalize());
-    let clearDistance = distance;
-    for (const wall of this.cameraWalls) {
-      if (this.cameraRay.intersectBox(wall, this.cameraHit))
-        clearDistance = Math.min(
-          clearDistance,
-          Math.max(1.5, this.cameraHit.distanceTo(this.focus) - 0.5),
-        );
-    }
-    // Resolve obstruction immediately; ease back out after leaving the building.
-    const desiredCamera = this.focus.clone().add(offset.setLength(clearDistance));
-    this.camera.position.lerp(desiredCamera, clearDistance < distance ? 1 : smoothing);
+    this.camera.position.copy(this.focus).add(safeOffset);
     this.camera.lookAt(this.focus);
     const t = this.reducedMotion ? 0 : this.time;
     for (const s of this.steam) {
