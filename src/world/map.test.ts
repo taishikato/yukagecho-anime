@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   canWalk,
+  islands,
+  festivalIsland,
+  festivalBridge,
   canal,
   walkways,
   walkwayPoint,
@@ -41,7 +44,7 @@ describe('walkable main island', () => {
   it('allows crossing the canal only at bridges and keeps both banks walkable', () => {
     expect(surfaceHeight(canal.x, -20)).toBeNull();
     expect(surfaceHeight(canal.x, -5)).toBeNull();
-    for (const w of walkways.filter((w) => w.arch > 0)) {
+    for (const w of walkways.filter((w) => w.id.startsWith('canal-bridge-'))) {
       expect(surfaceHeight(canal.x, w.az)).toBeCloseTo(1.35);
       expect(surfaceHeight(canal.x, w.az + w.width / 2 + 0.1)).toBeNull();
     }
@@ -99,5 +102,23 @@ describe('registration interaction', () => {
     expect(interactionAt(spawn.x, spawn.z)?.kind).toBe('registration');
     expect(interactionAt(0, 37)?.kind).toBe('discovery');
     expect(interactionAt(100, 100)).toBeNull();
+  });
+});
+
+describe('festival island extension', () => {
+  it('preserves the original town platforms and keeps open sky between the islands', () => {
+    expect(islands.filter((island) => island.id !== festivalIsland.id)).toEqual([
+      { id: 'town', x: 0, z: 0, y: 0, radius: 78 },
+      { id: 'lower-town', x: 0, z: 100, y: -18, radius: 43, minZ: 81 },
+      { id: 'west-landing', x: -64, z: 74, y: -9, radius: 10 },
+      { id: 'east-landing', x: 64, z: 74, y: -9, radius: 10 },
+    ]);
+    expect(surfaceHeight(-83, 4)).toBeNull();
+    expect(surfaceHeight(-83, -4)).toBeNull();
+    expect(surfaceHeight(-83, 0)).not.toBeNull();
+    expect(surfaceHeight(festivalIsland.x, festivalIsland.z)).toBeCloseTo(0.15);
+    expect(canWalk(-83, festivalBridge.width / 2, [])).toBe(false);
+    const interaction = interactionAt(-113, 2, 0.15);
+    expect(interaction?.kind === 'discovery' && interaction.place.id).toBe('lofi-festival');
   });
 });

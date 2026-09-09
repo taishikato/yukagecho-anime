@@ -1,8 +1,11 @@
 import * as THREE from 'three';
+import { buildFestival } from './festival';
 import { weatherSurface } from './surfaces';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   islands,
+  festivalIsland,
+  festivalBridge,
   registrationSign,
   terrace,
   canal,
@@ -58,7 +61,7 @@ weatherSurface(materials.moss, 'earth');
 type Mat = keyof typeof materials;
 
 /** Static geometry is batched by material: thousands of details, a few dozen draw calls. */
-class Builder {
+export class Builder {
   batches = new Map<Mat, THREE.BufferGeometry[]>();
   group = new THREE.Group();
   add(
@@ -166,6 +169,7 @@ export interface WorldObjects {
   obstacles: Obstacle[];
   waters: THREE.Mesh[];
   steamSources: THREE.Vector3[];
+  animateFestival: (time: number) => void;
 }
 export function buildArchitecture(): WorldObjects {
   seed = 721;
@@ -412,7 +416,7 @@ export function buildArchitecture(): WorldObjects {
         }
     }
   }
-  for (const platform of islands)
+  for (const platform of islands.filter((i) => i.id !== festivalIsland.id))
     island(platform.x, platform.y, platform.z, platform.radius, false);
   // A shared bedrock connects the upper town, lower shelf and switchback buttresses.
   b.ball('darkStone', 0, -58, 45, 68, 35, 98);
@@ -483,9 +487,13 @@ export function buildArchitecture(): WorldObjects {
     const x = Math.cos(a) * 71.8,
       z = Math.sin(a) * 71.8;
     b.box('path2', x, 0.025, z, 2.0, 0.14, 3.8, -a - Math.PI / 2);
-    if (i % 2 === 0 && !(Math.abs(Math.abs(x) - 52) < 6 && z > 44 && z < 59))
+    if (
+      i % 2 === 0 &&
+      !(Math.abs(Math.abs(x) - 52) < 6 && z > 44 && z < 59) &&
+      !(x < -70 && Math.abs(z) < 4)
+    )
       fence(Math.cos(a) * 73.8, 0, Math.sin(a) * 73.8, 3.8, -a - Math.PI / 2);
-    if (i % 9 === 0) lantern(x, 0, z, true);
+    if (i % 9 === 0) lantern(x, 0, x < -70 && Math.abs(z) < 4 ? z + 3 : z, true);
   }
   // The public avenue leaves a wide view of the crown of the island.
   for (const [x, z, floors, w, d] of [
@@ -593,7 +601,7 @@ export function buildArchitecture(): WorldObjects {
         lantern(p.x, p.y, p.z, true);
       }
   }
-  walkways.forEach((w) => bridge(w));
+  walkways.filter((w) => w.id !== festivalBridge.id).forEach((w) => bridge(w));
   // Upper bridges are architectural connections, with no accessible upper interiors.
   for (const [z, y] of [
     [-21, 9],
@@ -637,7 +645,8 @@ export function buildArchitecture(): WorldObjects {
   for (const x of [canal.x - canal.width / 2 - 0.12, canal.x + canal.width / 2 + 0.12]) {
     b.box('darkStone', x, 0.12, canal.z, 0.3, 0.45, canal.length + 0.6);
     for (let z = -33; z <= 9; z += 1.5) {
-      if (walkways.some((w) => w.arch > 0 && Math.abs(w.az - z) < 2.1)) continue;
+      if (walkways.some((w) => w.id.startsWith('canal-bridge-') && Math.abs(w.az - z) < 2.1))
+        continue;
       b.box('timber', x, 0.6, z, 0.12, 1.2, 0.12);
       b.box('timber', x, 0.9, z, 0.09, 0.1, 1.55);
     }
@@ -984,7 +993,18 @@ export function buildArchitecture(): WorldObjects {
     roof(x, y + 3.16, z, 2.4, 1);
     obstacles.push({ x, z, halfX: 1.15, halfZ: 0.22 });
   }
-  return { group: b.finish(), obstacles, waters, steamSources };
+  // Append after the original scene so its seeded terrain and details stay identical.
+  island(festivalIsland.x, festivalIsland.y, festivalIsland.z, festivalIsland.radius, false);
+  bridge(festivalBridge);
+  const animateFestival = buildFestival(b, obstacles, {
+    roof,
+    tree,
+    lantern,
+    paving,
+    fence,
+    traveler: createTraveler,
+  });
+  return { group: b.finish(), obstacles, waters, steamSources, animateFestival };
 }
 
 export function createTraveler() {

@@ -16,10 +16,10 @@ test('exploration, journal persistence, camera, audio, night and photo', async (
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toContainText('Added to your travel journal');
   await page.keyboard.press('Escape');
-  await expect(page.getByText('1 / 9', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 / 10', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Save photo', exact: true })).toBeEnabled();
-  await expect(page.getByText('1 / 9', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 / 10', { exact: true })).toBeVisible();
   // Wait for the camera's documented entry transition before the visual snapshot.
   await page.waitForTimeout(1800);
   await page.screenshot({ path: '/tmp/yukagecho-desktop.png' });
@@ -200,6 +200,25 @@ test('walks around the main island, crosses every canal bridge and completes the
   ])
     await walkTo(x, z);
   await discover('Cloudsea Walk');
+  for (const [x, z] of [
+    [-39, 16],
+    [-50, 16],
+    [-50, 0],
+    [-71, 0],
+    [-94, 0],
+    [-113, 0],
+    [-113, 2],
+  ])
+    await walkTo(x, z);
+  await discover('Tsukine Lofi Sanctuary');
+  await page.screenshot({ path: '/tmp/yukagecho-festival-walk.png' });
+  for (const [x, z] of [
+    [-94, 0],
+    [-71, 0],
+    [-50, 0],
+    [-50, 16],
+  ])
+    await walkTo(x, z);
   for (const [x, z] of [
     [-39, 16],
     [-47, 16],

@@ -433,6 +433,7 @@ export class WorldEngine {
       s.sprite.scale.set(size, size * 1.4, 1);
       s.sprite.material.opacity = Math.sin(phase * Math.PI) * 0.16;
     }
+    this.objects.animateFestival(t);
     for (const water of this.objects.waters)
       (water.material as THREE.ShaderMaterial).uniforms.time.value = t;
     if (!this.reducedMotion && !this.isPaused) {

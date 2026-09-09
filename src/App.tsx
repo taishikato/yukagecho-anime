@@ -480,15 +480,17 @@ export default function App() {
                     ? 'Read the notice'
                     : state.place.id === 'onsen'
                       ? 'Pause by the hot springs'
-                      : state.place.id === 'shrine'
-                        ? 'Leave a wish on the wind'
-                        : state.place.id === 'inn'
-                          ? 'Visit the ryokan'
-                          : state.place.id === 'ascent'
-                            ? 'Take in the view'
-                            : state.place.id === 'ground-bath'
-                              ? 'Visit the springs'
-                              : 'Follow the lanterns'}
+                      : state.place.id === 'lofi-festival'
+                        ? 'Linger at the lofi gathering'
+                        : state.place.id === 'shrine'
+                          ? 'Leave a wish on the wind'
+                          : state.place.id === 'inn'
+                            ? 'Visit the ryokan'
+                            : state.place.id === 'ascent'
+                              ? 'Take in the view'
+                              : state.place.id === 'ground-bath'
+                                ? 'Visit the springs'
+                                : 'Follow the lanterns'}
                 </span>
               </span>
               <ChevronRight size={15} />
@@ -684,7 +686,8 @@ export default function App() {
               <br />
               Follow the promenade north to the grand ryokan. Explore the lantern canal to the east,
               or take either signed slope south to the lower night market. East and west routes form
-              a walking loop across three levels.
+              a walking loop across three levels. Cross the wooden bridge on the western rim to find
+              the lofi gathering at Tsukine Shrine.
             </p>
             {[
               { name: 'Walk', keys: 'W A S D / Arrow keys' },

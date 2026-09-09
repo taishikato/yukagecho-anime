@@ -18,12 +18,15 @@ export interface Place {
   symbol: string;
 }
 
-// One continuous landmass. Districts are neighborhoods, not separate islands.
+export const festivalIsland: Island = { id: 'lofi-island', x: -113, z: 0, y: 0, radius: 23 };
+
+// Original town platforms stay unchanged; the festival has its own landmass.
 export const islands: Island[] = [
   { id: 'town', x: 0, z: 0, y: 0, radius: 78 },
   { id: 'lower-town', x: 0, z: 100, y: -18, radius: 43, minZ: 81 },
   { id: 'west-landing', x: -64, z: 74, y: -9, radius: 10 },
   { id: 'east-landing', x: 64, z: 74, y: -9, radius: 10 },
+  festivalIsland,
 ];
 export const lowerTown = islands[1];
 export const spawn = { x: 0, y: 0.15, z: 43 };
@@ -42,7 +45,19 @@ export interface Walkway {
   arch: number;
   kind?: 'slope';
 }
+export const festivalBridge: Walkway = {
+  id: 'festival-bridge',
+  ax: -71,
+  az: 0,
+  bx: -94,
+  bz: 0,
+  ay: 0,
+  by: 0,
+  width: 4,
+  arch: 0.8,
+};
 export const walkways: Walkway[] = [
+  festivalBridge,
   ...[-1, 1].flatMap((side): Walkway[] => [
     {
       id: `${side < 0 ? 'west' : 'east'}-upper-slope`,
@@ -205,6 +220,18 @@ export const places: Place[] = [
     description: 'A second town, tucked beneath the first.',
     story:
       'Eighteen meters below the promenade, kitchens, tea shops and narrow inns crowd the lantern-lit street. Look up between the roofs to see the island rising above you. The east and west slopes both climb back to the upper town, making a full walking loop.',
+  },
+  {
+    id: 'lofi-festival',
+    name: '月音神社',
+    english: 'Tsukine Lofi Sanctuary',
+    symbol: '音',
+    x: -113,
+    z: 2,
+    y: 0,
+    description: 'Slow beats, warm lanterns, and a little shrine above the clouds.',
+    story:
+      'Cross the wooden bridge from the western rim to Tsukine Shrine. A DJ tends the turntables beneath paper lanterns, while a few travelers linger in the courtyard. Find a cushion, look out over the clouds, and take your time. This little festival is a place to simply be.',
   },
 ];
 
